@@ -1,0 +1,10 @@
+tqdm
+json_tricks
+opencv_python
+prettytable
+scipy
+numpy
+matplotlib
+easydict
+PyYAML
+tensorboardX
