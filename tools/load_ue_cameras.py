@@ -1,7 +1,8 @@
 import os.path
 import re
 import json
-
+import numpy as np
+from ue_utils import transform_unreal_to_stadium
 data = """
 STADIUM_CamRot  0 P=-1.200000 Y=67.400001 R=0.000000
 STADIUM_CamPos  0 X=-4417.165 Y=-3333.712 Z=425.752
@@ -50,8 +51,24 @@ def get_data(data):
 # output_json = json.dumps(output_data, indent=4)
 # print(output_json)
 
+def load_ue_cameras(path,dst_dir):
+    with open(path, 'r') as f:
+        data=f.readlines()
+    data=list(filter(lambda x:x.strip(),data))
+    cameras={}
+    for i in range(4):
+        camera_data=data[i*6:(i+1)*6]
+        camera_data=get_data("\n".join(camera_data))
+        # cameras[str(i)]=camera_data
+        cameras[str(i)] = {key: value for key, value in camera_data.items() if key != "STADIUM_Matrix"}
+        camera_data["STADIUM_CamPos"][1] = -camera_data["STADIUM_CamPos"][1]
+        cameras[str(i)]["STADIUM_CamPos"] = transform_unreal_to_stadium(cameras[str(i)]["STADIUM_CamPos"]).tolist()
+    with open(os.path.join(dst_dir,"cameras.json"),"w") as f:
+        json.dump(cameras,f,indent=2)
 
-def load_cameras(path,dst_dir):
+    # return cameras
+
+def process_cameras(path,dst_dir):
     with open(path, 'r') as f:
         data=f.readlines()
     data=list(filter(lambda x:x.strip(),data))
@@ -68,7 +85,6 @@ def load_cameras(path,dst_dir):
         json.dump(projs,f,indent=2)
     # print(cameras)
 
-
-load_cameras("/home/tww/Datasets/ue/val/camera.txt","/home/tww/Datasets/ue/val")
-
-
+if __name__ == '__main__':
+    process_cameras("/home/tww/Datasets/ue/train/camera.txt", "/home/tww/Datasets/ue/train")
+    load_ue_cameras("/home/tww/Datasets/ue/train/camera.txt", "/home/tww/Datasets/ue/train")

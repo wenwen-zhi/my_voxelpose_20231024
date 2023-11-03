@@ -85,20 +85,20 @@ class Association4DV2(JointsDataset):
         # self.pixel_std = 200.0
         # self.joints_def = JOINTS_DEF
         self.limbs = LIMBS
-        self.num_joints = 21
+        self.num_joints = cfg.DATASET.NUM_JOINTS
 
         if self.image_set == 'train':
             self.sequence_list = ["seq4"]
-            self._interval = 1
+            self._interval = cfg.DATASET.SAMPLE_INTERVAL
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             # self.cam_list = list(set([(0, n) for n in range(0, 31)]) - {(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)})
             # self.cam_list.sort()
-            self.num_views = 6
-        elif self.image_set == 'validation':
+            self.num_views = cfg.DATASET.CAMERA_NUM
+        elif self.image_set == 'validation' or self.image_set=='test':
             self.sequence_list = ["seq5"]
-            self._interval = 1
+            self._interval = cfg.DATASET.SAMPLE_INTERVAL
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
-            self.num_views = 6
+            self.num_views = cfg.DATASET.CAMERA_NUM
 
         self.db_file = 'group_{}_cam{}.pkl'.format(self.image_set, self.num_views)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
@@ -136,8 +136,8 @@ class Association4DV2(JointsDataset):
     def _get_db(self):
         # width = 368
         # height = 368
-        width = 2048
-        height = 1536
+        width = self.cfg.DATASET.IMAGE_WIDTH
+        height = self.cfg.DATASET.IMAGE_HEIGHT
         db = [] #[v1,v2,v3,v1,v2,v3,v1,v2,v3]
         # vi: {joints_2d: [num_person x num_joints x 2] }
         # print(self.sequence_list)

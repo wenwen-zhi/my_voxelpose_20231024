@@ -27,13 +27,11 @@ config.WORKERS = 8
 config.PRINT_FREQ = 100
 config.TRAIN_2D_ONLY = False
 config.USE_POSE2D_PRED = True
-config.UNIT="mm"
 # higherhrnet definition
 config.MODEL_EXTRA = edict()
 config.MODEL_EXTRA.PRETRAINED_LAYERS = ['*']
 config.MODEL_EXTRA.FINAL_CONV_KERNEL = 1
 config.MODEL_EXTRA.STEM_INPLANES = 64
-
 
 config.MODEL_EXTRA.STAGE2 = edict()
 config.MODEL_EXTRA.STAGE2.NUM_MODULES = 1
@@ -157,8 +155,6 @@ config.TRAIN.ENABLE_CACHE = True
 
 config.TRAIN.BATCH_SIZE = 8
 config.TRAIN.SHUFFLE = True
-config.TRAIN.ROOT_DIST_THRESHOLD=500
-config.TRAIN.HEATMAP_SIGMA_3D=200
 
 # testing
 config.TEST = edict()
@@ -253,7 +249,6 @@ def update_config(config_file):
                         config[k] = v
             else:
                 raise ValueError("{} not exist in config.py".format(k))
-
 
 
 def gen_config(config_file):

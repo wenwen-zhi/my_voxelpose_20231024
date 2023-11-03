@@ -10,7 +10,7 @@ from __future__ import print_function
 import glob
 import os.path as osp
 import numpy as np
-import json_tricks as json
+import json
 import pickle
 import logging
 import os
@@ -73,14 +73,18 @@ logger = logging.getLogger(__name__)
 #          [12, 13],
 #          [13, 14]]
 
+
 # LIMBS = np.array([0, 0, 0, 1, 2, 2, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18,
 #                   1, 13, 16, 2, 3, 5, 9, 4, 6, 7, 8, 10, 11, 12, 14, 15, 19, 17, 18, 20]).reshape((-1, 2)).tolist()
 
+LIMBS = np.array([0, 0, 0, 1, 1, 1, 3, 4, 6, 7, 9, 9, 9, 9, 9, 14, 16, 16, 16, 16, 16, 21,
+                  1, 15, 22, 2, 5, 8, 4, 5, 7, 8, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22]).reshape(
+    (-1, 2)).tolist()
 
-
+#处理ue的数据集
 class UEDataset(JointsDataset):
     def __init__(self, cfg, image_set, is_train, transform=None, **kwargs):
-        super().__init__(cfg, image_set, is_train, transform,**kwargs)
+        super().__init__(cfg, image_set, is_train, transform, **kwargs)
 
         # self.pixel_std = 200.0
         # self.joints_def = JOINTS_DEF
@@ -88,14 +92,14 @@ class UEDataset(JointsDataset):
         self.num_joints = cfg.DATASET.NUM_JOINTS
         if self.image_set == 'train':
             self.sequence_list = ["train"]
-            self._interval = 1
+            self._interval = cfg.DATASET.SAMPLE_INTERVAL
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             # self.cam_list = list(set([(0, n) for n in range(0, 31)]) - {(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)})
             # self.cam_list.sort()
             self.num_views = cfg.DATASET.CAMERA_NUM
         elif self.image_set == 'validation':
             self.sequence_list = ["val"]
-            self._interval = 1
+            self._interval = cfg.DATASET.SAMPLE_INTERVAL
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             self.num_views = cfg.DATASET.CAMERA_NUM
 
@@ -103,7 +107,7 @@ class UEDataset(JointsDataset):
         self.db_file = os.path.join(self.dataset_root, self.db_file)
 
         ## 这里先检查缓存文件是否存在，如果存在就直接加载缓存，否则调用_get_db()生成数据
-        if  cfg.TRAIN.ENABLE_CACHE and osp.exists(self.db_file):
+        if cfg.TRAIN.ENABLE_CACHE and osp.exists(self.db_file):
             info = pickle.load(open(self.db_file, 'rb'))
             assert info['sequence_list'] == self.sequence_list
             assert info['interval'] == self._interval
@@ -120,12 +124,14 @@ class UEDataset(JointsDataset):
             pickle.dump(info, open(self.db_file, 'wb'))
         # self.db = self._get_db()
         self.db_size = len(self.db)
-    def _get_actor_3d(self,seq):
-        datafile = os.path.join(self.dataset_root,seq, 'actorsGT.json')
+
+    def _get_actor_3d(self, seq):
+        datafile = os.path.join(self.dataset_root, seq, 'actorsGT.json')
         with open(datafile, 'r', encoding='utf-8') as f:
             data = json.load(f)
             actor_3d = data['actor3D']
         return actor_3d
+
     # def _get_camera_projection_matrix(self,seq):
     #     # 加载投影矩阵
     #     projfile=os.path.join(self.dataset_root,seq,"proj.json")
@@ -138,23 +144,41 @@ class UEDataset(JointsDataset):
     #         _params = json.load(f)
     #     return _params
 
-    def _get_cam(self,dataset_dir,seq):
+    def _get_cam(self, dataset_dir, seq):
         projfile = os.path.join(dataset_dir, seq, "cameras.json")
         with open(projfile, 'r', encoding='utf-8') as f:
-            _params = json.load(f)
-        return _params
+            s = f.read()
+            # print(s)
+            cameras = json.loads(s)
+
+        # print("cameras:",cameras)
+        for id, cam in cameras.items():
+            for k, v in cam.items():
+                if isinstance(v, list):
+                    cameras[id][k] = np.array(v)
+        print(cameras)
+
+        ''''
+        
+        [1,2]
+        经过dataloader 组装后 变成
+        [tensor([1,1,1,1]),tensor([2,2,2,2])]
+        tensor([[1,2],[1,2],[1,2],[1,2]])
+        
+        '''
+        return cameras
 
     def _get_db(self):
         # width = 368
         # height = 368
         width = 1280
-        height =720
-        db = [] #[v1,v2,v3,v1,v2,v3,v1,v2,v3]
+        height = 720
+        db = []  # [v1,v2,v3,v1,v2,v3,v1,v2,v3]
         # vi: {joints_2d: [num_person x num_joints x 2] }
         # print(self.sequence_list)
         for seq in self.sequence_list:
             # 加载相关参数
-            cameras = self._get_cam(self.dataset_root,seq)
+            cameras = self._get_cam(self.dataset_root, seq)
             # cameras = self._get_cam(self.dataset_root, seq)
 
             actor_3d = self._get_actor_3d(seq)
@@ -162,17 +186,18 @@ class UEDataset(JointsDataset):
 
             # print(proj_dict)
 
-            num_frames=len(actor_3d)
+            num_frames = len(actor_3d)
+            # num_frames=10
 
-            for frame_idx in range(num_frames): # 遍历帧
+            for frame_idx in range(num_frames):  # 遍历帧
                 # 处理当
-                if frame_idx % self._interval== 0:
-                    pose3d_list=actor_3d[frame_idx]
+                if frame_idx % self._interval == 0:
+                    pose3d_list = actor_3d[frame_idx]
 
                     for camera_name, camera_info in cameras.items():
-                    # for camera_name, proj in proj_dict.items():
-                         # 处理当前相机（视野）
-                        image_path=osp.join(seq,"camera"+str(camera_name),f"ath0_run1.{'%04d'%frame_idx}.jpeg")
+                        # for camera_name, proj in proj_dict.items():
+                        # 处理当前相机（视野）
+                        image_path = osp.join(seq, "camera" + str(camera_name), f"ath0_run1.{'%04d' % frame_idx}.jpeg")
                         # 接下来加载此图片所对应的所有人的位姿
                         all_poses_3d = []
                         all_poses_vis_3d = []
@@ -181,30 +206,29 @@ class UEDataset(JointsDataset):
                         for pose3d in pose3d_list:
                             # 处理当前这个人
                             # pose3d = np.array(body['joints19']).reshape((-1, 4))
-                            pose3d=np.array(pose3d)
+                            pose3d = np.array(pose3d)
                             pose3d = pose3d[:self.num_joints]
                             joints_vis = pose3d[:, -1] > 0.1
                             if not joints_vis[self.root_id]:
                                 continue
 
-                            M = np.array([[1.0, 0.0, 0.0],
-                                          [0.0, 0.0, 1.0],
-                                          [0.0, 1.0, 0.0]])
-                            pose3d[:, 0:3] = pose3d[:, 0:3].dot(M)
-                            pose3d[:, 0:3] *= 1000
+                            # M = np.array([[1.0, 0.0, 0.0],
+                            #               [0.0, 0.0, 1.0],
+                            #               [0.0, 1.0, 0.0]])
+                            # pose3d[:, 0:3] = pose3d[:, 0:3].dot(M)
+                            # pose3d[:, 0:3] *= 1000
 
                             pose2d = np.zeros((pose3d.shape[0], 2))
-                            pose2d[:, :2] = project_pose3d_to_pose2d(self.cfg.TAG ,pose3d[:, :3], width=width, height=width,cam=camera_info)
+                            pose2d[:, :2] = project_pose3d_to_pose2d(self.cfg.TAG, pose3d[:, :3], width=width,
+                                                                     height=height, cam=camera_info)
+                            # if frame_idx == 100:
+                            #     print("pose2d", pose2d)
 
 
-
-
-                            all_poses_3d.append(pose3d[:, 0:3])# 我们也需要x10吗？
+                            all_poses_3d.append(pose3d[:, 0:3])  # 我们也需要x10吗？
                             all_poses_vis_3d.append(
                                 np.repeat(
                                     np.reshape(joints_vis, (-1, 1)), 3, axis=1))
-
-
 
                             x_check = np.bitwise_and(pose2d[:, 0] >= 0,
                                                      pose2d[:, 0] <= width - 1)
@@ -212,6 +236,11 @@ class UEDataset(JointsDataset):
                                                      pose2d[:, 1] <= height - 1)
                             check = np.bitwise_and(x_check, y_check)
                             joints_vis[np.logical_not(check)] = 0
+
+                            joints_vis[np.logical_not(check)] = 0
+
+                            # print("check:",check)
+                            # print("joints_vis:",joints_vis)
 
                             all_poses.append(pose2d)
                             all_poses_vis.append(
@@ -243,7 +272,13 @@ class UEDataset(JointsDataset):
                                 'camera': camera_info,
                                 # 'proj':proj
                             })
+                            # if frame_idx==100:
+                            #     print('joints_2d_db:', db[-1]['joints_2d'])
+                            #     print('joints_3d_db:', db[-1]['joints_3d'])
+                            #     print('camera_info:', camera_info)
+
         return db
+
 
     # def _get_cam(self, seq):
     #     # se4的参数已经修正过，没有问题。但如果使用seq2,seq5,则需要把里面的参数修正。
@@ -256,6 +291,7 @@ class UEDataset(JointsDataset):
     #             cameras[id][k] = np.array(v)
     #     return cameras
 
+ #返回单条数据，dataloader加载数据时会用到
     def __getitem__(self, idx):
         input, target, weight, target_3d, meta, input_heatmap = [], [], [], [], [], []
 
@@ -272,7 +308,7 @@ class UEDataset(JointsDataset):
                 input.append(i)
                 meta.append(m)
                 input_heatmap.append(ih)
-            return input, meta,input_heatmap
+            return input, meta, input_heatmap
         else:
             for k in range(self.num_views):
                 i, t, w, t3, m, ih = super().__getitem__(self.num_views * idx + k)
@@ -384,7 +420,3 @@ class UEDataset(JointsDataset):
         gt_ids = [e["gt_id"] for e in eval_list if e["mpjpe"] < threshold]
 
         return len(np.unique(gt_ids)) / total_gt
-
-
-
-

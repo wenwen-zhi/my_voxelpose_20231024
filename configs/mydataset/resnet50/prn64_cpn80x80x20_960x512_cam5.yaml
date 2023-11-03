@@ -29,7 +29,7 @@ DATASET:
   IMAGE_WIDTH: 2048
   IMAGE_HEIGHT: 1536
   NUM_FRAMES: 247
-  SMAPLE_INTERVAL: 2
+  SAMPLE_INTERVAL: 2
 NETWORK:
   PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'

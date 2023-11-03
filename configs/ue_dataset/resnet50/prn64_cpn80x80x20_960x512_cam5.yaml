@@ -2,6 +2,7 @@ CUDNN:
   BENCHMARK: true
   DETERMINISTIC: false
   ENABLED: true
+
 BACKBONE_MODEL: 'pose_resnet'
 MODEL: 'multi_person_posenet'
 DATA_DIR: ''
@@ -9,9 +10,10 @@ GPUS: '0'
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
 WORKERS: 8
-PRINT_FREQ: 100
+PRINT_FREQ: 50 #打印频率
 TAG: "ue"
-
+TRAIN_2D_ONLY: False
+UNIT: "m"
 DATASET:
   COLOR_RGB: True
   TRAIN_DATASET: 'ue_dataset'
@@ -29,8 +31,8 @@ DATASET:
   NUM_JOINTS: 23
   IMAGE_WIDTH: 1280
   IMAGE_HEIGHT: 720
-  NUM_FRAMES: 343
-  SMAPLE_INTERVAL: 2  # 每几个帧取一帧用于训练和测试
+  NUM_FRAMES: 888
+  SAMPLE_INTERVAL: 2  # 每几个帧取一帧用于训练和测试
 NETWORK:
   PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
@@ -40,7 +42,7 @@ NETWORK:
   - 720
   HEATMAP_SIZE:
   - 320
-  - 180
+  - 184
   SIGMA: 3
   NUM_JOINTS: 23
   USE_GT: False
@@ -63,43 +65,54 @@ TRAIN:
   BATCH_SIZE: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 10
+  END_EPOCH: 50 # 10
   RESUME: true
   OPTIMIZER: adam
   LR: 0.0001
   TRAIN_BACKBONE: true
   ENABLE_CACHE: false
+  ROOT_DIST_THRESHOLD: 0.5 #匹配pred和gt的跟关节时的距离阈值
+  HEATMAP_SIGMA_3D: 0.2 # 生成3d gt heatmap的高斯分布的sigma
 TEST:
   MODEL_FILE: 'model_best.pth.tar'
   BATCH_SIZE: 4
 DEBUG:
   DEBUG: true
-  SAVE_BATCH_IMAGES_GT: false
-  SAVE_HEATMAPS_GT: false
+  SAVE_BATCH_IMAGES_GT: true
+  SAVE_HEATMAPS_GT: true
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE: # 世界坐标系中我们所关注的空间。会把这部分空间投影到2D图像中，去获得2D信息，从而进行3D的识别。
-    - 10000.0
-    - 10000.0
-    - 3000.0
+    - 20
+    - 6
+    - 3.2
+    # - 50000
+    # - 3200
+    # - 3200
 #    - 1500.0
 #    - 1500.0
 #    - 1500.0
   SPACE_CENTER: # 在世界坐标系中，以某个点为中心，框出一块区域，区域的大小为 SPACE_SIZE。
-    - 0.0 # 120.0
-    - 0.0 # -600.0
-    - 0.0
+    - 35 # 120.0
+    - -5 # -600.0
+    - 1
+    # - 20000 # 120.0
+    # - -4000 # -600.0
+    # - 1000
   INITIAL_CUBE_SIZE: # 整个空间划分为多少个框，每个框会被检测是否包含一个人的根关键点
+    - 200
     - 60
-    - 60
-    - 40
+    - 32
   MAX_PEOPLE_NUM: 4
   THRESHOLD: 0.1
 PICT_STRUCT:
   GRID_SIZE: # 人体的框的大小
-    - 2000.0
-    - 2000.0
-    - 2000.0
+    - 2
+    - 2
+    - 2
+    # - 2000
+    # - 2000
+    # - 2000
   CUBE_SIZE: # 人体的框中进一步划分为cube_size个关键点框
     - 64
     - 64

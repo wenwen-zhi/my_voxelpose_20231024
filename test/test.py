@@ -117,25 +117,28 @@ def main():
             # raise
             # print(f"meta count: {len(meta)},meta camera out:",meta[i]["camera"])
             # raise
-            if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \
-                    or "association4d_v2" in config.DATASET.TEST_DATASET or "mydataset" in config.DATASET.TEST_DATASET :
-                pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta)
-                print(f"[predict output] pred.shape: {pred.shape}")
-            #     pred: [batch_size, num_person, num_joints, 5]
-            elif 'shelf_end_to_end' == config.DATASET.TEST_DATASET :
-                pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,views=inputs)
-            elif 'campus_end_to_end' == config.DATASET.TEST_DATASET :
+            # # config:项目配置，由配置文件和lib/core/config.py的内容共同决定
+            # if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \
+            #         or "association4d_v2" in config.DATASET.TEST_DATASET or "mydataset" in config.DATASET.TEST_DATASET :
+            #     pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta)
+            #     print(f"[predict output] pred.shape: {pred.shape}")
+            # #     pred: [batch_size, num_person, num_joints, 5]
+            # elif 'shelf_end_to_end' == config.DATASET.TEST_DATASET :
+            #     pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,views=inputs)
+            # elif 'campus_end_to_end' == config.DATASET.TEST_DATASET :
+            if config.DATASET.TEST_DATASET in ['panoptic',"association4d","association4d_v2","mydataset","shelf_end_to_end","campus_end_to_end","test_shelf","ue_dataset"]:
                 pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,views=inputs)
             elif config.DATASET.TEST_DATASET in ['shelf',"campus"]:
                 # print(meta)
                 pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,input_heatmaps=input_heatmaps)
             else:
                 raise Exception("不支持的数据集：", config.DATASET.TEST_DATASET)
-            print("Pose3d:", pred.shape, "mean：", pred[:, :, :, :3].mean())
+            print("Pose3d:", pred.shape, "mean:", pred[:, :, :, :3].mean())
 
             # 将3d pose投影到2d图像进行可视化
             for view_idx in range(len(inputs)):
                 # joints_2d: [batch_size, num_person , num_joints, 3]
+
                 center = meta[view_idx]['center'][0].detach().cpu().numpy()
                 scale = meta[view_idx]['scale'][0]
 
@@ -147,7 +150,16 @@ def main():
                 # print("joints_3d_info: mean:", pred.cpu().detach().numpy().mean(axis=2).mean(axis=0))
                 # 投影
                 pose3d = pred.cpu().detach().numpy()[:, :, :, :3]
-                if "camera" in meta[view_idx]:
+                if config.TAG=="ue":
+                    cam = {}
+                    # print("cameras:",meta[view_idx]['camera'])
+                    for k, v in meta[view_idx]['camera'].items():
+                        # k:cam_pos v:[pos,pos, pos, pos]
+                        # print("k:",k,"v:",v)
+                        cam[k] = v[0]
+                    xy = project_pose3d_to_pose2d(config.TAG, pose3d, width=width, height=height, cam=cam).astype(np.float32)
+                    xy = torch.from_numpy(xy)
+                elif "camera" in meta[view_idx]:
                     cam = {}
                     # print("cameras:",meta[view_idx]['camera'][0])
                     for k, v in meta[view_idx]['camera'].items():
@@ -183,7 +195,7 @@ def main():
                 # print("joints_info: mean:",joints_2d.mean(axis=2).mean(axis=0))
 
                 save_batch_image_with_joints_multi(
-                    inputs[view_idx], joints_2d, joints_2d_vis, [10] * batch_size,
+                    inputs[view_idx], joints_2d, joints_2d_vis, [config.MULTI_PERSON.MAX_PEOPLE_NUM] * batch_size,
                     os.path.join(pose2d_vis_dir, f"joints_2d_batch_{i}_view_{view_idx}.jpg")
                 )
 

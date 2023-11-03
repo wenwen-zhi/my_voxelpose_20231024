@@ -2,37 +2,39 @@ CUDNN:
   BENCHMARK: true
   DETERMINISTIC: false
   ENABLED: true
-BACKBONE_MODEL: 'pose_resnet'
+BACKBONE_MODEL: ''
 MODEL: 'multi_person_posenet'
 DATA_DIR: ''
 GPUS: '0'
 OUTPUT_DIR: 'output'
-TAG: 'shelf_test/reset50/trained_using_asso4d'
+# TAG: 'shelf_test/reset50/prn64_cpn80x80x20_960x512_cam5'
 LOG_DIR: 'log'
 WORKERS: 4
 PRINT_FREQ: 100
 
 DATASET:
   COLOR_RGB: True
-  TRAIN_DATASET: 'association4d_v2'
+  TRAIN_DATASET: 'shelf_synthetic' #数据加载文件的名字
   TEST_DATASET: 'shelf'
-  DATA_FORMAT: jpg
+  DATA_FORMAT: png
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: '/home/tww/Downloads/Projects/Shelf' # 'data/panoptic/'
+  ROOT: "/home/tww/Datasets/Shelf" # 'data/panoptic/'
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SUBSET: 'validation'
   TRAIN_SUBSET: 'train'
-  ROOTIDX: 0
+  ROOTIDX:
+    - 2
+    - 3
   CAMERA_NUM: 5
-  NUM_JOINTS: 21
+  NUM_JOINTS: 17
   IMAGE_WIDTH: 1032
   IMAGE_HEIGHT: 776
   NUM_FRAMES: 3200
-  SMAPLE_INTERVAL: 2
+  SAMPLE_INTERVAL: 2
 NETWORK:
-  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
+  PRETRAINED_BACKBONE: ""
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
@@ -42,7 +44,7 @@ NETWORK:
   - 200
   - 152
   SIGMA: 3
-  NUM_JOINTS: 21
+  NUM_JOINTS: 17
   USE_GT: False
 POSE_RESNET:
   FINAL_CONV_KERNEL: 1
@@ -70,7 +72,7 @@ TRAIN:
   TRAIN_BACKBONE: true
   ENABLE_CACHE: false
 TEST:
-  MODEL_FILE: 'model_best.pth.tar'
+  MODEL_FILE: 'model_best.pth.tar' #
   BATCH_SIZE: 4
 DEBUG:
   DEBUG: true

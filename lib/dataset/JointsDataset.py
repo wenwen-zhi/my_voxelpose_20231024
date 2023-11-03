@@ -135,6 +135,7 @@ class JointsDataset(Dataset):
             else:
                 # 说明deb_rec中没有 proj， 那db_rec是从哪来的你？
                 pass
+            # 不使用backbone 
             if "pred_pose2d" in db_rec and db_rec["pred_pose2d"] !=None:
                 pred_pose2d = db_rec['pred_pose2d']
                 for n in range(len(pred_pose2d)):
@@ -317,7 +318,7 @@ class JointsDataset(Dataset):
         grid1Dz = np.linspace(-space_size[2] / 2, space_size[2] / 2, cube_size[2]) + space_center[2]
 
         target = np.zeros((cube_size[0], cube_size[1], cube_size[2]), dtype=np.float32)
-        cur_sigma = 200.0
+        cur_sigma = self.cfg.TRAIN.HEATMAP_SIGMA_3D
 
         for n in range(num_people):
             joint_id = self.root_id  # mid-hip

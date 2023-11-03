@@ -77,7 +77,7 @@ def main():
             transforms.ToTensor(),
             normalize,
         ]))
-
+    # DataLoader数据加载器，负责一个batch一个batch地加载数据
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
@@ -132,20 +132,25 @@ def main():
     }
 
     print('=> Training...')
-    for epoch in range(start_epoch, end_epoch):
+    for epoch in range(start_epoch, end_epoch): # 训练的轮次
         print('Epoch: {}'.format(epoch))
 
         # lr_scheduler.step()
+        #
         train_3d(config, model, optimizer, train_loader, epoch, final_output_dir, writer_dict)
+        # 验证，计算指标
         precision = validate_3d(config, model, test_loader, final_output_dir)
+
 
         if precision > best_precision:
             best_precision = precision
             best_model = True
         else:
-            best_model = False
+            # best_model = False
+            best_model = True
 
         logger.info('=> saving checkpoint to {} (Best: {})'.format(final_output_dir, best_model))
+        # 保存模型的权重
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.module.state_dict(),
@@ -157,6 +162,7 @@ def main():
                                           'final_state.pth.tar')
     logger.info('saving final model state to {}'.format(
         final_model_state_file))
+    # 保存最后的模型
     torch.save(model.module.state_dict(), final_model_state_file)
 
     writer_dict['writer'].close()

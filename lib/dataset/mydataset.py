@@ -91,7 +91,7 @@ class MyDataset(JointsDataset):
             raise NotImplementedError("暂不支持训练！")
         elif self.image_set == 'validation':
             # self.sequence_list = ["seq5"]
-            self._interval = cfg.DATASET.SMAPLE_INTERVAL
+            self._interval = cfg.DATASET.SAMPLE_INTERVAL
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             self.num_views = cfg.DATASET.CAMERA_NUM
 

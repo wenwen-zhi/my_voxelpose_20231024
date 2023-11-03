@@ -39,11 +39,13 @@ def save_batch_image_with_joints_multi(batch_image,
     height = int(batch_image.size(2) + padding)
     width = int(batch_image.size(3) + padding)
     k = 0
+    # print("batch_joints.shape:",batch_joints.shape)
     for y in range(ymaps):
         for x in range(xmaps):
             if k >= nmaps:
                 break
             for n in range(num_person[k]):
+
 
                 joints = batch_joints[k, n]
                 # print("draw joints:", joints.mean(axis=0))
@@ -60,7 +62,7 @@ def save_batch_image_with_joints_multi(batch_image,
     # print("ndarr:",ndarr)
     cv2.imwrite(file_name, ndarr)
 
-
+# 将热图与原始图像合成并保存为一个图像文件，以便进行可视化或分析
 def save_batch_heatmaps_multi(batch_image, batch_heatmaps, file_name, normalize=True):
     '''
     batch_image: [batch_size, channel, height, width]
@@ -138,9 +140,9 @@ def save_debug_images_multi(config, input, meta, target, output, prefix):
         save_batch_image_with_joints_multi(input, meta['joints'], meta['joints_vis'], meta['num_person'], '{}_gt.jpg'.format(prefix1))
     if config.DEBUG.SAVE_HEATMAPS_GT:
         save_batch_heatmaps_multi(input, target, '{}_hm_gt.jpg'.format(prefix2))
-    if config.DEBUG.SAVE_BATCH_IMAGES_PRED:
-        save_batch_image_with_joints_multi(input, meta['joints'], meta['joints_vis'], meta['num_person'],
-                                           '{}_pred.jpg'.format(prefix1))
+    #这个地方回头要恢复，切记！！！！！！！！！
+    # if config.DEBUG.SAVE_BATCH_IMAGES_PRED:
+    #     save_batch_image_with_joints_multi(input, preds, meta['joints_vis'], meta['num_person'],'{}_pred.jpg'.format(prefix1))
     if config.DEBUG.SAVE_HEATMAPS_PRED:
         save_batch_heatmaps_multi(input, output, '{}_hm_pred.jpg'.format(prefix2))
 
@@ -161,7 +163,12 @@ LIMBS14 = [[0, 1], [1, 2], [3, 4], [4, 5], [2, 3], [6, 7], [7, 8], [9, 10],
 #association4D
 LIMBS21 = np.array([0, 0, 0, 1, 2, 2, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18,
                   1, 13, 16, 2, 3, 5, 9, 4, 6, 7, 8, 10, 11, 12, 14, 15, 19, 17, 18, 20]).reshape((2,-1)).T.tolist()
-
+#ue
+# LIMBS23=np.array([0,0,0,1,1,1,3,4,6,7,9,9,9,9,9,14,16,16,16,16,16,21,
+#                   1,15,22,2,5,8,4,5,7,8,10,11,12,13,14,15,17,18,19,20,21,22]).reshape((-1, 2)).tolist()
+LIMBS23=np.array([0,1,0,15,0,22,1,2,1,5,1,8,3,4,4,5,6,7,7,8,9,10,9,11,9,12,9,13,9,14,14,15,
+                  16,17,16,18,16,19,16,20,16,21,21,22]).reshape((-1, 2)).tolist()
+print(LIMBS23)
 
 def save_debug_3d_images(config, meta, preds, prefix):
     if not config.DEBUG.DEBUG:
@@ -191,28 +198,40 @@ def save_debug_3d_images(config, meta, preds, prefix):
         joints_3d = meta['joints_3d'][i]
         joints_3d_vis = meta['joints_3d_vis'][i]
         ax = plt.subplot(yplot, xplot, i + 1, projection='3d')
+        # print("num_person:",num_person)
         for n in range(num_person):
             joint = joints_3d[n]
+            # print("gt_joint:",joint)
             joint_vis = joints_3d_vis[n]
             for k in eval("LIMBS{}".format(len(joint))):
                 if joint_vis[k[0], 0] and joint_vis[k[1], 0]:
                     x = [float(joint[k[0], 0]), float(joint[k[1], 0])]
                     y = [float(joint[k[0], 1]), float(joint[k[1], 1])]
                     z = [float(joint[k[0], 2]), float(joint[k[1], 2])]
-                    ax.plot(x, y, z, c='r', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
+                    if config.TAG == "ue":
+                        ax.plot(x, y, z, c='r', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
+                                markeredgewidth=1)
+                    else:
+                        ax.plot(x, y, z, c='r', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
                             markeredgewidth=1)
                 else:
                     x = [float(joint[k[0], 0]), float(joint[k[1], 0])]
                     y = [float(joint[k[0], 1]), float(joint[k[1], 1])]
                     z = [float(joint[k[0], 2]), float(joint[k[1], 2])]
-                    ax.plot(x, y, z, c='r', ls='--', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
+                    if config.TAG == "ue":
+                        ax.plot(x, y, z, c='r', ls='--', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
+                                markeredgewidth=1)
+                    else:
+                        ax.plot(x, y, z, c='r', ls='--', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
                             markeredgewidth=1)
 
         colors = ['b', 'g', 'c', 'y', 'm', 'orange', 'pink', 'royalblue', 'lightgreen', 'gold']
         if preds is not None:
             pred = preds[i]
+            print("pred:", pred)
             for n in range(len(pred)):
                 joint = pred[n]
+                # print('pred_joint:',joint)
                 if joint[0, 3] >= 0:
                     for k in eval("LIMBS{}".format(len(joint))):
                         x = [float(joint[k[0], 0]), float(joint[k[1], 0])]
@@ -221,6 +240,7 @@ def save_debug_3d_images(config, meta, preds, prefix):
                         ax.plot(x, y, z, c=colors[int(n % 10)], lw=1.5, marker='o', markerfacecolor='w', markersize=2,
                                 markeredgewidth=1)
     plt.savefig(file_name)
+
     plt.close(0)
 def save_debug_3d_images_for_test(config, meta, preds, prefix,show=False):
     if not config.DEBUG.DEBUG:
@@ -296,6 +316,8 @@ def save_debug_3d_cubes(config, meta, root, prefix):
     for i in range(batch_size):
         roots_gt = meta['roots_3d'][i]
         num_person = meta['num_person'][i]
+        print("num_person",num_person)
+
         roots_pred = root[i]
         ax = plt.subplot(yplot, xplot, i + 1, projection='3d')
 

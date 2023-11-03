@@ -47,6 +47,7 @@ class PerJointMSELoss(nn.Module):
 
             heatmap_pred = output.reshape((batch_size, num_joints, -1))
             heatmap_gt = target.reshape((batch_size, num_joints, -1))
+            # print("heatmap_pred:",heatmap_pred.shape, "target_weight:",target_weight.shape, "heatmap_gt:",heatmap_gt.shape )
             loss = self.criterion(heatmap_pred.mul(target_weight), heatmap_gt.mul(target_weight))
         else:
             loss = self.criterion(output, target)
