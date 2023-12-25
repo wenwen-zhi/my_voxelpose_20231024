@@ -76,6 +76,11 @@ class Shelf(JointsDataset):
         with open(file, "rb") as pfile:
             logging.info("=> load {}".format(file))
             pred_2d = pickle.load(pfile)
+        # print("====================")
+        # print("pred_2d: {}", np.array(pred_2d).shape)
+        # json_file_path = os.path.join("/home/tww/Projects/voxelpose-pytorch/data/Shelf", "pred_shelf_maskrcnn_hrnet_coco.json")
+        # with open(json_file_path, "w") as json_file:
+        #     json.dump(pred_2d, json_file)
 
         return pred_2d
 
@@ -111,6 +116,7 @@ class Shelf(JointsDataset):
         datafile = os.path.join(self.dataset_root, 'actorsGT.mat')
         data = scio.loadmat(datafile)
         actor_3d = np.array(np.array(data['actor3D'].tolist()).tolist()).squeeze()  # num_person * num_frame
+        # print("actor_3d",actor_3d.shape)
 
         num_person = len(actor_3d)
         num_frames = len(actor_3d[0])
@@ -156,6 +162,7 @@ class Shelf(JointsDataset):
                     'camera': cam,
                     'pred_pose2d': preds
                 })
+                # print("all_poses_3d",np.array(all_poses_3d).shape)
 
         return db
 
@@ -171,6 +178,7 @@ class Shelf(JointsDataset):
         return cameras
 
     def __getitem__(self, idx):
+        # print("=="*100)
         input, target_heatmap, target_weight, target_3d, meta, input_heatmap = [], [], [], [], [], []
         if self.mode == "test":
             for k in range(self.num_views):
@@ -214,6 +222,8 @@ class Shelf(JointsDataset):
             pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
             pred = np.stack([self.coco2shelf3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
 
+            # print("pred_evaluate", pred.shape)
+
             for person in range(num_person):
                 gt = actor_3d[person][fi] * 1000.0
                 if len(gt[0]) == 0:
@@ -246,6 +256,7 @@ class Shelf(JointsDataset):
 
         actor_pcp = correct_parts / (total_parts + 1e-8)
         avg_pcp = np.mean(actor_pcp[:3])
+
 
         bone_group = OrderedDict(
             [('Head', [8]), ('Torso', [9]), ('Upper arms', [5, 6]),

@@ -7,45 +7,38 @@ MODEL: 'multi_person_posenet'
 DATA_DIR: ''
 GPUS: '0'
 OUTPUT_DIR: 'output'
-# TAG: 'shelf_test/reset50/prn64_cpn80x80x20_960x512_cam5'
-DEBUG_HEATMAP_DIR: 'debug'
 LOG_DIR: 'log'
 WORKERS: 4
 PRINT_FREQ: 100
 
 DATASET:
   COLOR_RGB: True
-  TRAIN_DATASET: 'ue_dataset' #训练时所使用的数据集加载器 ，会影响权重保存路径，因此会影响测试时加载权重文件的文件夹
-  TEST_DATASET: 'association4d_v2' #测试时所使用的数据集加载器 
+  TRAIN_DATASET: 'ue_dataset'
+  TEST_DATASET: 'panoptic'
   DATA_FORMAT: jpg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: "/home/tww/Datasets/4d_association_dataset/dataset/images" # 'data/panoptic/'
+  ROOT: 'data/panoptic-toolbox' # 'data/panoptic/'
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
-  # 用来判断区分是训练还是验证
   TEST_SUBSET: 'validation'
   TRAIN_SUBSET: 'train'
-  ROOTIDX: 0 # 根关节点编号
-  CAMERA_NUM: 6
-  NUM_JOINTS: 23
-  IMAGE_WIDTH: 2048
-  IMAGE_HEIGHT: 1536
-  SAMPLE_INTERVAL: 1
+  ROOTIDX: 2
+  CAMERA_NUM: 5
 NETWORK:
-  PRETRAINED_BACKBONE: ""
+  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
-  TARGET_TYPE: gaussian #2d热图真值的生成方式，高斯函数
+  TARGET_TYPE: gaussian
   IMAGE_SIZE:
-  - 640
-  - 640
+  - 960
+  - 512
   HEATMAP_SIZE:
-  - 160
-  - 160
-  SIGMA: 3 #2d热图真值的生成方式，高斯函数的sigma参数
-  NUM_JOINTS: 23
+  - 240
+  - 128
+  SIGMA: 3
+  NUM_JOINTS: 15
   USE_GT: False
-POSE_RESNET: # 网络结构配置
+POSE_RESNET:
   FINAL_CONV_KERNEL: 1
   DECONV_WITH_BIAS: False
   NUM_DECONV_LAYERS: 3
@@ -68,27 +61,22 @@ TRAIN:
   RESUME: true
   OPTIMIZER: adam
   LR: 0.0001
-  TRAIN_BACKBONE: true
-  ENABLE_CACHE: false
 TEST:
   MODEL_FILE: 'model_best.pth.tar'
   BATCH_SIZE: 4
 DEBUG:
   DEBUG: true
-  SAVE_BATCH_IMAGES_GT: false
-  SAVE_HEATMAPS_GT: false
+  SAVE_HEATMAPS_GT: true
   SAVE_HEATMAPS_PRED: true
-
-
 MULTI_PERSON:
   SPACE_SIZE:
-    - 6000.0
-    - 6000.0
-    - 4000.0
+    - 8000.0
+    - 8000.0
+    - 2000.0
   SPACE_CENTER:
     - 0.0 # 120.0
-    - 0.0 # -600.0
-    - 0.0
+    - -500.0 # -600.0
+    - 800.0
   INITIAL_CUBE_SIZE:
     - 80
     - 80

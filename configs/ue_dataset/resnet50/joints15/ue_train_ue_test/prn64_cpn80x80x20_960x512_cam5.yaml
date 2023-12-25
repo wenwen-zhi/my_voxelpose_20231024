@@ -16,26 +16,27 @@ TRAIN_2D_ONLY: False
 UNIT: "m"
 DATASET:
   COLOR_RGB: True
-  TRAIN_DATASET: 'ue_dataset'
+  TRAIN_DATASET: 'ue_dataset' #训练时所使用的数据集加载器 ，会影响权重保存路径，因此会影响测试时加载权重文件的文件夹
   TEST_DATASET: 'ue_dataset'
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: '/home/tww/Datasets/ue' # 'data/panoptic/
+  ROOT: '/home/tww/Datasets/ue/joints15' # 'data/panoptic/
   ROT_FACTOR: 45 # 这个参数无用
   SCALE_FACTOR: 0.35 # 这个参数无用
   TEST_SUBSET: 'validation'
   TRAIN_SUBSET: 'train'
-  ROOTIDX: 2 # 根关节点编号
+  ROOTIDX: 2
+  # 根关节点编号
   CAMERA_NUM: 4
   NUM_JOINTS: 15
   IMAGE_WIDTH: 1280
   IMAGE_HEIGHT: 720
   NUM_FRAMES: 888
-  SAMPLE_INTERVAL: 50 # 每几个帧取一帧用于训练和测试
+  SAMPLE_INTERVAL: 2 # 每几个帧取一帧用于训练和测试
 NETWORK:
-  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
-  PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
+  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"  #预训练模型骨干网络
+  PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth' #预训练模型路径
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
   - 1280
@@ -65,7 +66,7 @@ TRAIN:
   BATCH_SIZE: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 118 # 10
+  END_EPOCH: 60 # 10
   RESUME: true
   OPTIMIZER: adam
   LR: 0.0001

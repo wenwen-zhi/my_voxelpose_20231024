@@ -78,7 +78,8 @@ def main():
     # print("final_output_dir:",final_output_dir)
     if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
         logger.info('=> load models state {}'.format(test_model_file))
-        model.module.load_state_dict(torch.load(test_model_file))
+        # print(test_model_file)
+        model.module.load_state_dict(torch.load(test_model_file), strict=False) #strict==False非严格匹配
     else:
         raise ValueError('Check the model file for testing!')
 
@@ -90,6 +91,8 @@ def main():
         for i, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(tqdm(test_loader)):
             if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET:
                 pred, _, _, _, _, _ = model(views=inputs, meta=meta)
+            elif config.DATASET.TEST_DATASET in ["ue_dataset"]:
+                pred, _, _, _, _, _ = model(views=inputs, meta=meta)
             elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
                 pred, _, _, _, _, _ = model(meta=meta, input_heatmaps=input_heatmap)
 
@@ -99,8 +102,10 @@ def main():
 
         # 计算指标，打印结果
         tb = PrettyTable()
-        if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET:
+        if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \
+                or "association4d_v2" in config.DATASET.TEST_DATASET :
             mpjpe_threshold = np.arange(25, 155, 25)
+
             aps, recs, mpjpe, _ = test_dataset.evaluate(preds)
             tb.field_names = ['Threshold/mm'] + [f'{i}' for i in mpjpe_threshold]
             tb.add_row(['AP'] + [f'{ap * 100:.2f}' for ap in aps])

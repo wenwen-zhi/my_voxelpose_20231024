@@ -28,6 +28,7 @@ def save_batch_image_with_joints_multi(batch_image,
     num_person: [batch_size]
     }
     '''
+    # print('num_person',num_person)
     batch_image = batch_image.flip(1)
     grid = torchvision.utils.make_grid(batch_image, nrow, padding, True)
     ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
@@ -166,8 +167,8 @@ LIMBS21 = np.array([0, 0, 0, 1, 2, 2, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 
 #ue
 # LIMBS23=np.array([0,0,0,1,1,1,3,4,6,7,9,9,9,9,9,14,16,16,16,16,16,21,
 #                   1,15,22,2,5,8,4,5,7,8,10,11,12,13,14,15,17,18,19,20,21,22]).reshape((-1, 2)).tolist()
-LIMBS23=np.array([0,1,0,15,0,22,1,2,1,5,1,8,3,4,4,5,6,7,7,8,9,10,9,11,9,12,9,13,9,14,14,15,
-                  16,17,16,18,16,19,16,20,16,21,21,22]).reshape((-1, 2)).tolist()
+LIMBS23=np.array([0,1,0,15,0,22,1,2,1,5,1,8,3,4,4,5,6,7,7,8,9,10,9,15,10,11,10,12,10,13,10,14,
+                  16,17,16,22,17,18,17,19,17,20,17,21]).reshape((-1, 2)).tolist()
 print(LIMBS23)
 
 def save_debug_3d_images(config, meta, preds, prefix):
@@ -228,7 +229,7 @@ def save_debug_3d_images(config, meta, preds, prefix):
         colors = ['b', 'g', 'c', 'y', 'm', 'orange', 'pink', 'royalblue', 'lightgreen', 'gold']
         if preds is not None:
             pred = preds[i]
-            print("pred:", pred)
+            # print("pred:", pred)
             for n in range(len(pred)):
                 joint = pred[n]
                 # print('pred_joint:',joint)
@@ -316,7 +317,7 @@ def save_debug_3d_cubes(config, meta, root, prefix):
     for i in range(batch_size):
         roots_gt = meta['roots_3d'][i]
         num_person = meta['num_person'][i]
-        print("num_person",num_person)
+        # print("num_person",num_person)
 
         roots_pred = root[i]
         ax = plt.subplot(yplot, xplot, i + 1, projection='3d')

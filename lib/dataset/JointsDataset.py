@@ -84,6 +84,9 @@ class JointsDataset(Dataset):
     # @linetimer.linetimer(name="加载单条数据")
     def __getitem__(self, idx):
         db_rec = copy.deepcopy(self.db[idx])
+        # print("db_rec[joints_3d]___getitem__",np.array(db_rec["joints_3d"]).shape)
+        # print("db_rec['joints_2d']___getitem__", np.array(db_rec["joints_2d"]).shape)
+        # print("db",db_rec)
 
         #### 加载图片
         image_file = db_rec['image']
@@ -150,10 +153,13 @@ class JointsDataset(Dataset):
         else:
             # 关于标签的处理
             joints = db_rec['joints_2d']
+            # print("joints___getitem__:",np.array(joints).shape) #14
+
             joints_vis = db_rec['joints_2d_vis']
             joints_3d = db_rec['joints_3d']
             joints_3d_vis = db_rec['joints_3d_vis']
             nposes = len(joints)
+            # print("nposes",nposes)
             assert nposes <= self.maximum_person, 'too many persons'
             for n in range(nposes):
                 for i in range(len(joints[0])):
@@ -170,9 +176,11 @@ class JointsDataset(Dataset):
                 # to generate 2d heatmaps for Campus and Shelf dataset.
                 # You can also use other 2d backbone trained on COCO to generate 2d heatmaps directly.
                 pred_pose2d = db_rec['pred_pose2d']
+                # print("pred_pose2d_before___getitem__",np.array(pred_pose2d).shape) #17
                 for n in range(len(pred_pose2d)):
                     for i in range(len(pred_pose2d[n])):
                         pred_pose2d[n][i, 0:2] = affine_transform(pred_pose2d[n][i, 0:2], trans)
+                # print("pred_pose2d_after___getitem__", np.array(pred_pose2d).shape)
                 input_heatmap = self.generate_input_heatmap(pred_pose2d)
                 input_heatmap = torch.from_numpy(input_heatmap)
             else:
@@ -190,6 +198,7 @@ class JointsDataset(Dataset):
                 joints_vis_u[i] = joints_vis[i]
 
             joints_3d_u = np.zeros((self.maximum_person, self.num_joints, 3))
+            # print("self.num_joints",self.num_joints)
             joints_3d_vis_u = np.zeros((self.maximum_person, self.num_joints, 3))
             for i in range(nposes):
                 joints_3d_u[i] = joints_3d[i][:, 0:3]
@@ -227,9 +236,12 @@ class JointsDataset(Dataset):
             return input, target_heatmap, target_weight, target_3d, meta, input_heatmap
 
     def compute_human_scale(self, pose, joints_vis):
-        idx = joints_vis[:, 0] == 1
+        # print("pose_compute_human_scale",np.array(pose).shape)
+
+        idx = joints_vis[:, 0] == 1 #idx的维度是读取的关节数
         if np.sum(idx) == 0:
             return 0
+        # print("idx_compute_human_scale", np.array(idx).shape)
         minx, maxx = np.min(pose[idx, 0]), np.max(pose[idx, 0])
         miny, maxy = np.min(pose[idx, 1]), np.max(pose[idx, 1])
         # return np.clip((maxy - miny) * (maxx - minx), 1.0 / 4 * 256**2,
@@ -245,10 +257,12 @@ class JointsDataset(Dataset):
         :return: target, target_weight(1: visible, 0: invisible)
         '''
         nposes = len(joints)
+        # print('nposes: ', nposes)
         num_joints = self.num_joints
+        # print('num_joints: ', num_joints)
         target_weight = np.zeros((num_joints, 1), dtype=np.float32)
         for i in range(num_joints):
-            for n in range(nposes):
+            for n in range(nposes): # nposes是人数
                 if joints_vis[n][i, 0] == 1:
                     target_weight[i, 0] = 1
 
@@ -264,6 +278,7 @@ class JointsDataset(Dataset):
             feat_stride = self.image_size / self.heatmap_size
 
             for n in range(nposes):
+                # print("joints[n] / feat_stride_generate_target_heatmap",np.array(joints[n] / feat_stride).shape)
                 human_scale = 2 * self.compute_human_scale(joints[n] / feat_stride, joints_vis[n])
                 if human_scale == 0:
                     continue
@@ -346,14 +361,18 @@ class JointsDataset(Dataset):
         target = np.clip(target, 0, 1)
         return target
 
+
     def generate_input_heatmap(self, joints):
         '''
-        :param joints:  [[num_joints, 3]]
+        :param joints:  [[num_person, num_joints, 3]]
         :param joints_vis: [num_joints, 3]
         :return: input_heatmap
         '''
-        nposes = len(joints)
+        nposes = len(joints)  #
+        # print("nposes_generate_input_heatmap",nposes)
+        # print("joints_generate_input_heatmap",np.array(joints).shape)
         num_joints = self.cfg.NETWORK.NUM_JOINTS
+
 
         assert self.target_type == 'gaussian', \
             'Only support gaussian map now!'
@@ -366,6 +385,7 @@ class JointsDataset(Dataset):
             feat_stride = self.image_size / self.heatmap_size
 
             for n in range(nposes): # for each 位姿(人)
+                # print("joints[n][:, 0:2] / feat_stride_generate_input_heatmap", np.array(joints[n][:, 0:2] / feat_stride).shape)
                 human_scale = 2 * self.compute_human_scale(joints[n][:, 0:2] / feat_stride, np.ones((num_joints, 1)))
                 if human_scale == 0:
                     continue

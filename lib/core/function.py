@@ -49,6 +49,8 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
     # input_heatmap 输入2D的heatmap
     for i, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(tqdm(loader)):
         data_time.update(time.time() - end)
+        # print("targets_3d",targets_3d)
+        # print("meta[joints_3d]",meta["joints_3d"].shape)
         timer.step("数据加载")
         if config.TRAIN_2D_ONLY:
             # 模型推理
@@ -62,7 +64,7 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
             loss = loss_2d
             losses.update(loss.item())
         else:
-            if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET:
+            if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
                 # print(targets_3d[0].shape)
                 result = model(views=inputs, meta=meta,
                                targets_2d=targets_2d,
@@ -146,11 +148,11 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
             writer_dict['train_global_steps'] = global_steps + 1
 
             # 遍历每个视野，保存可视化结果
+            print('len(inputs)',len(inputs))
             for k in range(len(inputs)):
                 view_name = 'view_{}'.format(k + 1)
                 prefix = '{}_{:08}_{}'.format(
                     os.path.join(output_dir, 'train'), i, view_name)
-
                 save_debug_images_multi(
                     config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
             prefix2 = '{}_{:08}'.format(
@@ -179,7 +181,7 @@ def validate_3d(config, model, loader, output_dir):
                                targets_3d=targets_3d[0])
                 heatmaps, loss_2d = result  # heatmaps is predicted
             else:
-                if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET or 'association4d_v2' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET:
+                if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET or 'association4d_v2' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
                     pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta, targets_2d=targets_2d,
                                                                   weights_2d=weights_2d, targets_3d=targets_3d[0])
 
@@ -221,7 +223,7 @@ def validate_3d(config, model, loader, output_dir):
 
     if not config.TRAIN_2D_ONLY:
         metric = None
-        if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET:
+        if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET :
             aps, _, mpjpe, recall = loader.dataset.evaluate(preds)
             msg = 'ap@25: {aps_25:.4f}\tap@50: {aps_50:.4f}\tap@75: {aps_75:.4f}\t' \
                   'ap@100: {aps_100:.4f}\tap@125: {aps_125:.4f}\tap@150: {aps_150:.4f}\t' \
@@ -231,11 +233,16 @@ def validate_3d(config, model, loader, output_dir):
                   )
             logger.info(msg)
             metric = np.mean(aps)
-        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
+        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
             actor_pcp, avg_pcp, _, recall = loader.dataset.evaluate(preds)
+            # print("data:", actor_pcp[0]*100, actor_pcp[1]*100, actor_pcp[2]*100, avg_pcp[0]*100, recall )
+            # print( ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
+            #           pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall))
+            print("actor_pcp",actor_pcp)
+            print("pcp_avg", avg_pcp )
             msg = '     | Actor 1 | Actor 2 | Actor 3 | Average | \n' \
                   ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
-                      pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp*100, recall=recall)
+                      pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall)
             logger.info(msg)
             metric = np.mean(avg_pcp)
 

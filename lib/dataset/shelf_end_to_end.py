@@ -67,13 +67,17 @@ class ShelfEndToEnd(JointsDataset):
         self.limbs = LIMBS
         self.num_joints = len(SHELF_JOINTS_DEF)
         self.cam_list = [0, 1, 2, 3, 4]
-        self.num_views = len(self.cam_list)
-        self.frame_range = list(range(300, 601))
+        if self.mode =="train":
+            self.frame_range = list(range(300, 496))
+        else:
+            self.frame_range = list(range(517, 599))
 
         self.db = self._get_db()
         self.db_size = len(self.db)
 
 
+    def _get_frames(self):
+        frames_path = os.path.join(self.dataset_root, "frames.json")
 
     def _get_db(self):
         width = 1032
@@ -103,9 +107,22 @@ class ShelfEndToEnd(JointsDataset):
         datafile = os.path.join(self.dataset_root, 'actorsGT.mat')
         data = scio.loadmat(datafile)
         actor_3d = np.array(np.array(data['actor3D'].tolist()).tolist()).squeeze()  # num_person * num_frame
-
+        # json_file_path = os.path.join("/home/tww/Projects/voxelpose-pytorch/data/Shelf", "actorsGT.json")
+        # with open(json_file_path, "w") as json_file:
+        #     json.dump(actor_3d, json_file)
+        # input()
         num_person = len(actor_3d)
+        print("num_person",num_person)
         num_frames = len(actor_3d[0])
+
+        #读取shelf的非零帧用于训练train
+        non_empty_frame_indices = []  # 用于存储非零帧的索引
+        for frame_idx in range(actor_3d.shape[1]):
+            tmp = [actor_3d[p_idx][frame_idx].size for p_idx in range(4)]
+            if sum(tmp) != 0:
+                non_empty_frame_indices.append(frame_idx)
+        if self.mode == "train":
+            self.frame_range = non_empty_frame_indices
 
         for i in self.frame_range:
             for k, cam in cameras.items():
@@ -115,8 +132,11 @@ class ShelfEndToEnd(JointsDataset):
                 all_poses_vis_3d = []
                 all_poses = []
                 all_poses_vis = []
+
                 for person in range(num_person):
                     pose3d = actor_3d[person][i] * 1000.0
+                    # print("pose3d[0]: ", pose3d[0].shape)
+                    # input()
                     if len(pose3d[0]) > 0:
                         all_poses_3d.append(pose3d)
                         all_poses_vis_3d.append(np.ones((self.num_joints, 3)))
@@ -128,7 +148,6 @@ class ShelfEndToEnd(JointsDataset):
                         y_check = np.bitwise_and(pose2d[:, 1] >= 0,
                                                  pose2d[:, 1] <= height - 1)
                         check = np.bitwise_and(x_check, y_check)
-
                         joints_vis = np.ones((len(pose2d), 1))
                         joints_vis[np.logical_not(check)] = 0
                         all_poses.append(pose2d)
@@ -136,9 +155,9 @@ class ShelfEndToEnd(JointsDataset):
                             np.repeat(
                                 np.reshape(joints_vis, (-1, 1)), 2, axis=1))
 
-                pred_index = '{}_{}'.format(k, i)
-                preds = self.pred_pose2d[pred_index]
-                preds = [np.array(p["pred"]) for p in preds]
+                # pred_index = '{}_{}'.format(k, i)
+                # preds = self.pred_pose2d[pred_index]
+                # preds = [np.array(p["pred"]) for p in preds]
                 db.append({
                     'image': osp.join(self.dataset_root, image),
                     'joints_3d': all_poses_3d,
@@ -146,7 +165,7 @@ class ShelfEndToEnd(JointsDataset):
                     'joints_2d': all_poses,
                     'joints_2d_vis': all_poses_vis,
                     'camera': cam,
-                    'pred_pose2d': preds
+                    # 'pred_pose2d': preds
                 })
 
         return db
@@ -203,10 +222,17 @@ class ShelfEndToEnd(JointsDataset):
         alpha = 0.5
         bone_correct_parts = np.zeros((num_person, 10))
 
+
+
         for i, fi in enumerate(self.frame_range):
-            pred_coco = preds[i].copy()
-            pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
-            pred = np.stack([self.coco2shelf3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+            # pred_coco = preds[i].copy()
+            # pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
+            # pred = np.stack([self.coco2shelf3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+
+            pred=preds[i].copy()
+            print("beforpred", pred, pred.shape)
+            pred = pred[pred[:, 0, 3] >= 0, :, :3]
+            print("pred",pred,pred.shape)
 
             for person in range(num_person):
                 gt = actor_3d[person][fi] * 1000.0
@@ -214,6 +240,7 @@ class ShelfEndToEnd(JointsDataset):
                     continue
 
                 mpjpes = np.mean(np.sqrt(np.sum((gt[np.newaxis] - pred) ** 2, axis=-1)), axis=-1)
+                print("mpjpes:",mpjpes)
                 min_n = np.argmin(mpjpes)
                 min_mpjpe = np.min(mpjpes)
                 if min_mpjpe < recall_threshold:

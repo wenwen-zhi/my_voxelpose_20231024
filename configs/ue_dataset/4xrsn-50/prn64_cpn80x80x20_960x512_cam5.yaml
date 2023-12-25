@@ -3,7 +3,7 @@ CUDNN:
   DETERMINISTIC: false
   ENABLED: true
 
-BACKBONE_MODEL: 'pose_resnet'
+BACKBONE_MODEL: 'pose_4xrsn'
 MODEL: 'multi_person_posenet'
 DATA_DIR: ''
 GPUS: '0'
@@ -26,15 +26,15 @@ DATASET:
   SCALE_FACTOR: 0.35 # 这个参数无用
   TEST_SUBSET: 'validation'
   TRAIN_SUBSET: 'train'
-  ROOTIDX: 2 # 根关节点编号
+  ROOTIDX: 0 # 根关节点编号
   CAMERA_NUM: 4
-  NUM_JOINTS: 15
+  NUM_JOINTS: 14
   IMAGE_WIDTH: 1280
   IMAGE_HEIGHT: 720
   NUM_FRAMES: 888
   SAMPLE_INTERVAL: 50 # 每几个帧取一帧用于训练和测试
 NETWORK:
-  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
+  PRETRAINED_BACKBONE: ""
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
@@ -44,7 +44,7 @@ NETWORK:
   - 320
   - 184
   SIGMA: 3
-  NUM_JOINTS: 15
+  NUM_JOINTS: 23
   USE_GT: False
 POSE_RESNET:
   FINAL_CONV_KERNEL: 1
@@ -65,7 +65,7 @@ TRAIN:
   BATCH_SIZE: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 118 # 10
+  END_EPOCH: 88 # 10
   RESUME: true
   OPTIMIZER: adam
   LR: 0.0001

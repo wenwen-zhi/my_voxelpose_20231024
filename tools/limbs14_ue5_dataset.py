@@ -7,11 +7,7 @@ import numpy as np
 from load_ue_cameras import load_ue_cameras
 from ue_utils import transform_unreal_to_stadium
 
-selected_joints = ["head", "neck_01", "upperarm_correctiveRoot_l", "upperarm_correctiveRoot_r",
-                   "lowerarm_correctiveRoot_l", "lowerarm_correctiveRoot_r", "middle_metacarpal_l",
-                   "middle_metacarpal_r", "pelvis", "thigh_correctiveRoot_l", "thigh_correctiveRoot_r",
-                   "calf_l", "calf_r", "ankle_bck_l", "ankle_bck_r", "ankle_fwd_l", "ankle_fwd_r",
-                   "foot_l", "foot_r", "littletoe_02_l", "littletoe_02_r", "bigtoe_02_l", "bigtoe_02_r"]
+selected_joints = ["foot_r","calf_correctiveRoot_r","thigh_correctiveRoot_r","thigh_correctiveRoot_l","calf_correctiveRoot_l","foot_l","hand_r","lowerarm_correctiveRoot_r","upperarm_correctiveRoot_r","upperarm_correctiveRoot_l","lowerarm_correctiveRoot_l","hand_l","neck_01","head"]
 
 
 def load_ue_gt(path, selected_joints=None,unit_factor=1):
@@ -39,7 +35,11 @@ def load_ue_gt(path, selected_joints=None,unit_factor=1):
                 pos = np.append(pos, k)
                 # print("pos:", pos)
 
-                frame_data.append(pos.tolist())
+                index = selected_joints.index(joint_name)
+                while len(frame_data) <= index:
+                    frame_data.append([])  # 确保 frame_data 中有足够的位置用于当前关节
+                frame_data[index] = pos.tolist()
+
             if frame_idx != -1:
                 data.append(frame_data)
             else:

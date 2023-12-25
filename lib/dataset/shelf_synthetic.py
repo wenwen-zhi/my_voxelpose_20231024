@@ -78,8 +78,12 @@ class ShelfSynthetic(Dataset):
         self.space_center = np.array(cfg.MULTI_PERSON.SPACE_CENTER)
         self.initial_cube_size = np.array(cfg.MULTI_PERSON.INITIAL_CUBE_SIZE)
 
-        pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")
+        pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")   #这里是17个
         self.pose_db = pickle.load(open(pose_db_file, "rb"))
+        # print("============================================================")
+        # json_file_path = os.path.join("/home/tww/Projects/voxelpose-pytorch/data", "panoptic_training_pose.json")
+        # with open(json_file_path, "w") as json_file:
+        #     json.dump(self.pose_db, json_file)
         self.cameras = self._get_cam()
 
     def _get_cam(self):
@@ -95,12 +99,13 @@ class ShelfSynthetic(Dataset):
 
     def __getitem__(self, idx):
         # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.1, 0.2, 0.4, 0.2])
+        # 生成满足一定条件的一组随机人体姿势样本
         nposes = np.random.choice(range(1, 6))
         bbox_list = []
         center_list = []
 
         select_poses = np.random.choice(self.pose_db, nposes)
-        joints_3d = np.array([p['pose'] for p in select_poses])
+        joints_3d = np.array([p['pose'] for p in select_poses])  #joints_3d就是17个关键点
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
         for n in range(0, nposes):
@@ -117,7 +122,7 @@ class ShelfSynthetic(Dataset):
                 if loop_count >= 100:
                     break
                 new_center = self.get_new_center(center_list)
-                new_xy = rotate_points(points, center, rot_rad) - center + new_center
+                new_xy = rotate_points(points, center, rot_rad) - center + new_center #通过旋转和平移操作生成一个新的姿势样本
 
             if loop_count >= 100:
                 nposes = n
@@ -137,6 +142,8 @@ class ShelfSynthetic(Dataset):
             input_heatmap.append(ih)
             target_3d.append(t3)
             meta.append(m)
+
+        # print("target_3d__getitem__",target_3d.shape)
         return input, target_heatmap, target_weight, target_3d, meta, input_heatmap
 
     def __len__(self):
@@ -159,7 +166,7 @@ class ShelfSynthetic(Dataset):
         joints = []
         joints_vis = []
         for n in range(nposes):
-            pose2d = project_pose(joints_3d[n], cam)
+            pose2d = project_pose(joints_3d[n], cam)  #将 3D 姿势投影到 2D 图像平面
 
             x_check = np.bitwise_and(pose2d[:, 0] >= 0,
                                      pose2d[:, 0] <= width - 1)
@@ -246,7 +253,7 @@ class ShelfSynthetic(Dataset):
         :return: input_heatmap
         '''
         nposes = len(joints)
-        num_joints = joints[0].shape[0]
+        num_joints = joints[0].shape[0]   #num_joints=17
         target_weight = np.zeros((num_joints, 1), dtype=np.float32)
         for i in range(num_joints):
             for n in range(nposes):

@@ -19,6 +19,7 @@ import torch.optim as optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 from lib.core.config import config
@@ -70,15 +71,17 @@ def main():
     print('=> Loading data ..')
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    
+
+    # =============初始化数据集Dataset===============
     train_dataset = get_dataset(config.DATASET.TRAIN_DATASET)(
         config, config.DATASET.TRAIN_SUBSET, True,
         transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ]))
-    # DataLoader数据加载器，负责一个batch一个batch地加载数据
-    train_loader = torch.utils.data.DataLoader(
+    #=============初始化DataLoader数据加载器，目的是负责一个batch一个batch地加载数据==============
+
+    train_loader = DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
         # batch_size=config.TRAIN.BATCH_SIZE*len(gpus),
@@ -132,6 +135,7 @@ def main():
     }
 
     print('=> Training...')
+    print("start_epoch, end_epoch:", start_epoch, end_epoch)
     for epoch in range(start_epoch, end_epoch): # 训练的轮次
         print('Epoch: {}'.format(epoch))
 
@@ -148,6 +152,7 @@ def main():
         else:
             # best_model = False
             best_model = True
+
 
         logger.info('=> saving checkpoint to {} (Best: {})'.format(final_output_dir, best_model))
         # 保存模型的权重

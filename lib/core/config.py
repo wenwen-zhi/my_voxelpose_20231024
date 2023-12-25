@@ -29,6 +29,8 @@ config.TRAIN_2D_ONLY = False
 config.USE_POSE2D_PRED = True
 config.UNIT="mm"
 # higherhrnet definition
+config.DEBUG_HEATMAP_DIR="debug"
+
 config.MODEL_EXTRA = edict()
 config.MODEL_EXTRA.PRETRAINED_LAYERS = ['*']
 config.MODEL_EXTRA.FINAL_CONV_KERNEL = 1
