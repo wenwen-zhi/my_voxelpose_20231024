@@ -86,8 +86,8 @@ class Panoptic(JointsDataset):
             self.sequence_list = TRAIN_LIST
             self._interval = 10
             # self._interval = 1000
-            # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
-            self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
+            self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
+            # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
             # self.cam_list = list(set([(0, n) for n in range(0, 31)]) - {(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)})
             # self.cam_list.sort()
             self.num_views = len(self.cam_list)
@@ -95,14 +95,14 @@ class Panoptic(JointsDataset):
             self.sequence_list = VAL_LIST
             self._interval = 20
             # self._interval = 1000
-            # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
-            self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
+            self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
+            # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
             self.num_views = len(self.cam_list)
 
         self.db_file = 'group_{}_cam{}.pkl'.format(self.image_set, self.num_views)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
-
-        if osp.exists(self.db_file):
+        # disable
+        if False and osp.exists(self.db_file):
             info = pickle.load(open(self.db_file, 'rb'))
             assert info['sequence_list'] == self.sequence_list
             assert info['interval'] == self._interval
@@ -152,6 +152,7 @@ class Panoptic(JointsDataset):
                         for body in bodies:
                             pose3d = np.array(body['joints19']).reshape((-1, 4))
                             pose3d = pose3d[:self.num_joints]
+                            # print(f"PoseInfo: shape: {pose3d.shape} min: {pose3d.min()}, max: {pose3d.max()}")
 
                             joints_vis = pose3d[:, -1] > 0.1
 
@@ -274,6 +275,7 @@ class Panoptic(JointsDataset):
                 continue
 
             pred = preds[i].copy()
+            # print("pred", pred)
             pred = pred[pred[:, 0, 3] >= 0]
             for pose in pred:
                 mpjpes = []

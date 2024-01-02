@@ -2,7 +2,7 @@ CUDNN:
   BENCHMARK: true
   DETERMINISTIC: false
   ENABLED: true
-BACKBONE_MODEL: 'pose_resnet'
+BACKBONE_MODEL: 'pose_ resnet'
 MODEL: 'multi_person_posenet'
 DATA_DIR: ''
 GPUS: '0'
@@ -25,8 +25,9 @@ DATASET:
   TRAIN_SUBSET: 'train'
   ROOTIDX: 2
   CAMERA_NUM: 5
+  NUM_JOINTS: 15
 NETWORK:
-  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
+  PRETRAINED_BACKBONE: ""
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
@@ -81,8 +82,23 @@ MULTI_PERSON:
     - 80
     - 80
     - 20
-  MAX_PEOPLE_NUM: 10
-  THRESHOLD: 0.3
+#  SPACE_SIZE:
+#    - 10000.0
+#    - 10000.0
+#    - 3000.0
+#  SPACE_CENTER:
+#      #    - 450.0 # 120.0
+#      #    - -320.0 # -600.0
+#      #    - 800.0
+#      - 0
+#      - 0
+#      - 0
+#  INITIAL_CUBE_SIZE:
+#      - 100
+#      - 100
+#      - 40
+#  MAX_PEOPLE_NUM: 10
+#  THRESHOLD: 0.3 #
 PICT_STRUCT:
   GRID_SIZE:
     - 2000.0

@@ -100,6 +100,9 @@ def main():
             for b in range(pred.shape[0]):
                 preds.append(pred[b])
 
+        # print("preds",preds)
+        # print("inputs",inputs)
+
         # 计算指标，打印结果
         tb = PrettyTable()
         if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \

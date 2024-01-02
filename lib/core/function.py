@@ -84,6 +84,8 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
             losses_3d.update(loss_3d.item())
             losses_cord.update(loss_cord.item())
 
+
+
             # 修改前代码#######+
             # loss = loss_2d + loss_3d + loss_cord
             # losses.update(loss.item())
@@ -221,6 +223,7 @@ def validate_3d(config, model, loader, output_dir):
                 save_debug_3d_cubes(config, meta[0], grid_centers, prefix2)
                 save_debug_3d_images(config, meta[0], pred, prefix2)
 
+    print("preds", preds)
     if not config.TRAIN_2D_ONLY:
         metric = None
         if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET :
@@ -238,8 +241,8 @@ def validate_3d(config, model, loader, output_dir):
             # print("data:", actor_pcp[0]*100, actor_pcp[1]*100, actor_pcp[2]*100, avg_pcp[0]*100, recall )
             # print( ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
             #           pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall))
-            print("actor_pcp",actor_pcp)
-            print("pcp_avg", avg_pcp )
+            # print("actor_pcp",actor_pcp)
+            # print("pcp_avg", avg_pcp )
             msg = '     | Actor 1 | Actor 2 | Actor 3 | Average | \n' \
                   ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
                       pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall)

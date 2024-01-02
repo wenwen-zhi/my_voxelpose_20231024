@@ -15,6 +15,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch import Tensor
 
 from lib.core.config import get_model_name
 
@@ -27,6 +28,18 @@ def get_global_object(name):
         g[name]=O()
     return g[name]
 
+import torch
+from torch import Tensor
+
+def print_tensor_info(name: str, t: Tensor):
+    tensor_info = (
+        f"Tensor Name: {name}, "
+        f"Shape: {t.shape}, "
+        f"Max Value: {torch.max(t)}, "
+        f"Min Value: {torch.min(t)}, "
+        f"Mean Value: {torch.mean(t.float())}"
+    )
+    print(tensor_info)
 
 
 def create_logger(cfg, cfg_name, phase='train'):
@@ -103,7 +116,7 @@ def load_checkpoint(model, optimizer, output_dir, filename='checkpoint.pth.tar')
         start_epoch = checkpoint['epoch']
         precision = checkpoint['precision'] if 'precision' in checkpoint else 0
         model.module.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        # optimizer.load_state_dict(checkpoint['optimizer'])
         print('=> load checkpoint {} (epoch {})'
               .format(file, start_epoch))
 

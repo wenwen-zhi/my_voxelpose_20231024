@@ -5,7 +5,7 @@
 #     '''
 #     显示3d数组
 #     '''
-#
+
 
 import numpy as np
 import matplotlib.pyplot as plt
