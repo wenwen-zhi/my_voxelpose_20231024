@@ -7,18 +7,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import sys
-sys.path.extend(["."])
 
+sys.path.extend(["."])
 
 import argparse
 import os
 
-
 import numpy as np
-
-
-
-
+import time
+import json
+from datetime import datetime
 from lib.utils import cameras
 from lib.dataset import get_dataset
 from lib.models import get_model
@@ -37,7 +35,8 @@ from lib.core.config import config
 from lib.core.config import update_config
 from lib.utils.association4d_utils import project_pose3d_to_pose2d
 from lib.utils.utils import create_logger
-from lib.utils.vis import save_debug_3d_cubes_for_test, save_batch_image_with_joints_multi
+from lib.utils.vis import save_debug_3d_cubes_for_test, save_batch_image_with_joints_multi, \
+    visualize_heatmaps_on_images, save_heatmaps
 from lib.utils.vis import save_debug_3d_images_for_test
 from lib.utils.transforms import get_affine_transform as get_transform
 from lib.utils.transforms import affine_transform_pts_cuda as do_transform
@@ -58,6 +57,7 @@ def main():
         config, args.cfg, 'test')
     cfg_name = os.path.basename(args.cfg).split('.')[0]
     # final_output_dir=config.OUTPUT_DIR
+    print('final_output_dir', final_output_dir)
     gpus = [int(i) for i in config.GPUS.split(',')]
     print('=> Loading data ..')
     normalize = transforms.Normalize(
@@ -93,7 +93,7 @@ def main():
 
     test_model_file = os.path.join(final_output_dir, config.TEST.MODEL_FILE)
     # print("final_output_dir:",final_output_dir)
-    print("loading model file from :",test_model_file)
+    print("loading model file from :", test_model_file)
     if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
         logger.info('=> load models state {}'.format(test_model_file))
         model.module.load_state_dict(torch.load(test_model_file))
@@ -104,41 +104,43 @@ def main():
     model.eval()
     preds = []
     pose2d_vis_dir = os.path.join(final_output_dir, 'pose2d_vis')
+    heatmaps_2d_vis_dir = os.path.join(final_output_dir, '2d_heatmaps')
     if os.path.exists(pose2d_vis_dir):
         shutil.rmtree(pose2d_vis_dir)
         time.sleep(1e-7)
     os.makedirs(pose2d_vis_dir, exist_ok=True)
+    os.makedirs(heatmaps_2d_vis_dir, exist_ok=True)
+    preds_to_save = []
     with torch.no_grad():
         # 模型预测
         for i, (inputs, meta, input_heatmaps) in enumerate(tqdm(test_loader)):
             # inputs shape : num_view x batch_size x 3 x h x w
             batch_size = len(inputs[0])
-            # print(f"inputs shape: {inputs[0].shape}  mata_size: {len(meta)}")
-            # raise
-            # print(f"meta count: {len(meta)},meta camera out:",meta[i]["camera"])
-            # raise
-            # # config:项目配置，由配置文件和lib/core/config.py的内容共同决定
-            # if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \
-            #         or "association4d_v2" in config.DATASET.TEST_DATASET or "mydataset" in config.DATASET.TEST_DATASET :
-            #     pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta)
-            #     print(f"[predict output] pred.shape: {pred.shape}")
-            # #     pred: [batch_size, num_person, num_joints, 5]
-            # elif 'shelf_end_to_end' == config.DATASET.TEST_DATASET :
-            #     pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,views=inputs)
-            # elif 'campus_end_to_end' == config.DATASET.TEST_DATASET :
-            if config.DATASET.TEST_DATASET in ['panoptic',"association4d","association4d_v2","mydataset","shelf_end_to_end","campus_end_to_end","test_shelf","ue_dataset"]:
-                pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,views=inputs)
-            elif config.DATASET.TEST_DATASET in ['shelf',"campus"]:
-                # print(meta)
-                pred, heatmaps, grid_centers, _, _, _ = model(meta=meta,input_heatmaps=input_heatmaps)
+
+            if config.PREDICT_ON_2DHEATMAP or config.DATASET.TEST_DATASET in ['shelf', "campus"]:
+                pred, heatmaps, grid_centers, _, _, _ = model(meta=meta, input_heatmaps=input_heatmaps)
+            elif config.TEST.PREDICT_FROM_IMAGES or config.DATASET.TEST_DATASET in ['panoptic', "association4d",
+                                                                                    "association4d_v2", "mydataset",
+                                                                                    "shelf_end_to_end",
+                                                                                    "campus_end_to_end", "test_shelf",
+                                                                                    "ue_dataset"]:
+                pred, heatmaps, grid_centers, _, _, _ = model(meta=meta, views=inputs)
             else:
                 raise Exception("不支持的数据集：", config.DATASET.TEST_DATASET)
             print("Pose3d:", pred.shape, "mean:", pred[:, :, :, :3].mean())
-
+            print("heatmaps.shape:", len(heatmaps), heatmaps[0].shape)
+            print("inputs.shape", len(inputs), inputs[0].shape)
+            # input()
+            visualize_heatmaps_on_images(
+                inputs, heatmaps, os.path.join(heatmaps_2d_vis_dir, f"batch_{i}.jpg")
+            )
+            heatmap_dir = os.path.join(config.OUTPUT_DIR, config.DEBUG_HEATMAP_DIR, "2d_heatmaps_v2")
+            os.makedirs(heatmap_dir, exist_ok=True)
             # 将3d pose投影到2d图像进行可视化
             for view_idx in range(len(inputs)):
                 # joints_2d: [batch_size, num_person , num_joints, 3]
-
+                save_heatmaps(heatmaps[view_idx],
+                              os.path.join(heatmap_dir, f"train_heatmp2d_batch{i}_view{view_idx}.jpg"))
                 center = meta[view_idx]['center'][0].detach().cpu().numpy()
                 scale = meta[view_idx]['scale'][0]
 
@@ -150,14 +152,15 @@ def main():
                 # print("joints_3d_info: mean:", pred.cpu().detach().numpy().mean(axis=2).mean(axis=0))
                 # 投影
                 pose3d = pred.cpu().detach().numpy()[:, :, :, :3]
-                if config.TAG=="ue":
+                if config.TAG == "ue":
                     cam = {}
                     # print("cameras:",meta[view_idx]['camera'])
                     for k, v in meta[view_idx]['camera'].items():
                         # k:cam_pos v:[pos,pos, pos, pos]
                         # print("k:",k,"v:",v)
                         cam[k] = v[0]
-                    xy = project_pose3d_to_pose2d(config.TAG, pose3d, width=width, height=height, cam=cam).astype(np.float32)
+                    xy = project_pose3d_to_pose2d(config.TAG, pose3d, width=width, height=height, cam=cam).astype(
+                        np.float32)
                     xy = torch.from_numpy(xy)
                 elif "camera" in meta[view_idx]:
                     cam = {}
@@ -167,11 +170,11 @@ def main():
                         # print(k,v.shape)
                         cam[k] = v[0]
 
-                    pose3d=torch.from_numpy(pose3d)
+                    pose3d = torch.from_numpy(pose3d)
                     pre_shape = pose3d.shape[:-1]
-                    pose3d=torch.reshape(pose3d,(-1,3))
+                    pose3d = torch.reshape(pose3d, (-1, 3))
                     xy = cameras.project_pose(pose3d, cam)
-                    xy=torch.reshape(xy,(*pre_shape,2))
+                    xy = torch.reshape(xy, (*pre_shape, 2))
                 elif 'proj' in meta[view_idx]:
 
                     joints_2d = project_pose3d_to_pose2d(config.TAG, pose3d,
@@ -190,9 +193,6 @@ def main():
                 joints_2d = xy.detach().cpu().numpy()
 
                 joints_2d_vis = torch.ones((*joints_2d.shape[:3], 1))
-                # joints_2d=joints_2d*meta[view_idx]["scale"][0].detach().cpu().numpy()
-                # print("joints_2d shape:",joints_2d.shape)
-                # print("joints_info: mean:",joints_2d.mean(axis=2).mean(axis=0))
 
                 save_batch_image_with_joints_multi(
                     inputs[view_idx], joints_2d, joints_2d_vis, [config.MULTI_PERSON.MAX_PEOPLE_NUM] * batch_size,
@@ -201,39 +201,33 @@ def main():
 
             for b in range(pred.shape[0]):
                 preds.append(pred[b])
-            # for k in range(len(inputs)):
-            #     view_name = 'view_{}'.format(k + 1)
-            #     prefix = '{}_{:08}_{}'.format(
-            #         os.path.join(final_output_dir, 'validation'), i, view_name)
-            #     _meta={}
-            #     _meta["joints"]=preds[k]
-            #     _meta["joints_viz"]=torch.ones((preds[k][:,3].shape))
-            #     save_debug_images_multi(config, inputs[k], _meta, None, heatmaps[k], prefix)
+            if isinstance(pred, torch.Tensor):
+                preds_to_save.append(pred.detach().cpu().numpy())
+            else:
+                preds_to_save.append(pred)
+            # if isinstance()
+
             prefix2 = '{}_{:08}'.format(
                 os.path.join(final_output_dir, 'test'), i)
             save_debug_3d_cubes_for_test(config, meta[0], grid_centers, prefix2)
 
             # matplotlib.use('TkAgg')
-            save_debug_3d_images_for_test(config, meta[0], pred, prefix2, show=False)
+            save_debug_3d_images_for_test(config, meta[0], pred, prefix2, show=False, save_with_timestamps=config.TEST.SAVE_WITH_TIMESTAMPS)
             # matplotlib.use('Agg')
+    preds_to_save = np.array(preds_to_save).tolist()
 
-        # 计算指标，打印结果
-        # tb = PrettyTable()
-        # if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET:
-        #     mpjpe_threshold = np.arange(25, 155, 25)
-        #     aps, recs, mpjpe, _ = test_dataset.evaluate(preds)
-        #     tb.field_names = ['Threshold/mm'] + [f'{i}' for i in mpjpe_threshold]
-        #     tb.add_row(['AP'] + [f'{ap * 100:.2f}' for ap in aps])
-        #     tb.add_row(['Recall'] + [f'{re * 100:.2f}' for re in recs])
-        #     print(tb)
-        #     print(f'MPJPE: {mpjpe:.2f}mm')
-        # else:
-        #     actor_pcp, avg_pcp, bone_person_pcp, _ = test_dataset.evaluate(preds)
-        #     tb.field_names = ['Bone Group'] + [f'Actor {i+1}' for i in range(len(actor_pcp))] + ['Average']
-        #     for k, v in bone_person_pcp.items():
-        #         tb.add_row([k] + [f'{i*100:.1f}' for i in v] + [f'{np.mean(v)*100:.1f}'])
-        #     tb.add_row(['Total'] + [f'{i*100:.1f}' for i in actor_pcp] + [f'{avg_pcp*100:.1f}'])
-        #     print(tb)
+    if config.RESULTS_DIR:
+        json_dir = os.path.join(config.OUTPUT_DIR, config.RESULTS_DIR, "json")
+        os.makedirs(json_dir, exist_ok=True)
+        data = dict(
+            preds_to_save=preds_to_save
+        )
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        json_path = os.path.join(json_dir, f"pose_preds_{timestamp}.json")
+
+        # 保存数据
+        with open(json_path, 'w') as json_file:
+            json.dump(data, json_file, indent=4)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import shutil
 import time
 import logging
 import os
@@ -9,15 +10,28 @@ import copy
 
 import torch
 import numpy as np
+import wk
 
+from lib.dataset.shelf import Shelf
+from lib.utils.transforms import preds_coco2shelf, preds_coco2campus
+from lib.utils.utils import save_checkpoint
 from lib.utils.vis import save_debug_images_multi
 from lib.utils.vis import save_debug_3d_images
-from lib.utils.vis import save_debug_3d_cubes
+from lib.utils.vis import save_debug_3d_cubes, save_heatmaps
 from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
+def run_test(output_dir):
+    model_path = os.path.join(output_dir,"model_best.pth.tar")
+    target_path = "/home/tww/Projects/voxelpose-pytorch/output/mydatasetv2/resnet50/synthetic_v2_test/model_best.pth.tar"
+    if os.path.exists(model_path):
+        shutil.copy(model_path, target_path)
+        os.system("/home/tww/Programs/anaconda3/bin/python test/test.py --cfg configs/mydatasetv2/resnet50/synthetic_v2_test.yaml" )
+
 def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, device=torch.device('cuda'), dtype=torch.float):
+
+    run_test(output_dir)
 
     # 一些统计数据的工具类，例如统计平均损失等
     batch_time = AverageMeter()
@@ -30,7 +44,7 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
     model.train() #model：nn.module  将模型调整为训练模式 ，会缓存数据,便于反向传播时计算梯度，以及更新batchnorm参数
 
 
-    if model.module.backbone is not None:
+    if model.module.backbone is not None and not config.TRAIN.TRAIN_BACKBONE:
         # Comment out this line if you want to train 2D backbone jointly
         # 把backone调整为测试模式
         model.module.backbone.eval()
@@ -48,23 +62,33 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
     # meta, 存储数据集相关信息，例如相机参数
     # input_heatmap 输入2D的heatmap
     for i, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(tqdm(loader)):
+        # print("inputs:", inputs)
+        # print("inputs.shape:", len(inputs),inputs[0].shape)
+        # input()
         data_time.update(time.time() - end)
         # print("targets_3d",targets_3d)
         # print("meta[joints_3d]",meta["joints_3d"].shape)
         timer.step("数据加载")
         if config.TRAIN_2D_ONLY:
             # 模型推理
+            timer2 = wk.Timer(mute=True)
+            timer2.step("模型推理")
             result = model(views=inputs, meta=meta,
                            targets_2d=targets_2d,
                            weights_2d=weights_2d,
                            targets_3d=targets_3d[0])
+            timer2.step("推理完成")
             heatmaps, loss_2d = result #heatmaps is predicted
             loss_2d = loss_2d.mean()
             losses_2d.update(loss_2d.item())
             loss = loss_2d
             losses.update(loss.item())
         else:
-            if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
+            if config.PREDICT_ON_2DHEATMAP or 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
+                pred, heatmaps, grid_centers, loss_2d, loss_3d, loss_cord = model(meta=meta, targets_3d=targets_3d[0],
+                                                                                  input_heatmaps=input_heatmap)
+            elif 'panoptic' in config.DATASET\
+                    .TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET or "association4d_v2" in config.DATASET.TEST_DATASET or "ue_dataset" == config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
                 # print(targets_3d[0].shape)
                 result = model(views=inputs, meta=meta,
                                targets_2d=targets_2d,
@@ -72,9 +96,9 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
                                targets_3d=targets_3d[0])
 
                 pred, heatmaps, grid_centers, loss_2d, loss_3d, loss_cord = result
-            elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
-                pred, heatmaps, grid_centers, loss_2d, loss_3d, loss_cord = model(meta=meta, targets_3d=targets_3d[0],
-                                                                                  input_heatmaps=input_heatmap)
+                # print("[train batch] pred:", pred)
+                # input()
+
 
             loss_2d = loss_2d.mean()
             loss_3d = loss_3d.mean()
@@ -124,6 +148,14 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
         # print("targets_2d[K]_min:",torch.stack(targets_2d).min())
         # print("targets_2d[K]_mean:",torch.stack(targets_2d).mean())
 
+        if config.MODEL_SAVE_INTERVAL and i % config.MODEL_SAVE_INTERVAL == config.MODEL_SAVE_INTERVAL-1:
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.module.state_dict(),
+                'precision': 0,
+                'optimizer': optimizer.state_dict(),
+            }, True, output_dir)
+
         if i % config.PRINT_FREQ == 0: #每100次打印一次，config.PRINT_FREQ = 100
             gpu_memory_usage = torch.cuda.memory_allocated(0)
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
@@ -151,17 +183,27 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
 
             # 遍历每个视野，保存可视化结果
             print('len(inputs)',len(inputs))
+            heatmap_dir = os.path.join(config.OUTPUT_DIR, config.DEBUG_HEATMAP_DIR, "2d_heatmaps_v2")
+            os.makedirs(heatmap_dir, exist_ok=True)
             for k in range(len(inputs)):
                 view_name = 'view_{}'.format(k + 1)
                 prefix = '{}_{:08}_{}'.format(
                     os.path.join(output_dir, 'train'), i, view_name)
                 save_debug_images_multi(
                     config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
+                save_heatmaps(heatmaps[k], os.path.join(heatmap_dir, f"train_heatmp2d_batch{i}_view{k}.jpg"))
             prefix2 = '{}_{:08}'.format(
                 os.path.join(output_dir, 'train'), i)
             if not config.TRAIN_2D_ONLY:
                 save_debug_3d_cubes(config, meta[0], grid_centers, prefix2)
-                save_debug_3d_images(config, meta[0], pred, prefix2)
+                if config.COCO2SHELF:
+                    new_pred = preds_coco2shelf(pred)
+                    save_debug_3d_images(config, meta[0], new_pred, prefix2)
+                elif config.COCO2CAMPUS:
+                    new_pred = preds_coco2campus(pred)
+                    save_debug_3d_images(config, meta[0], new_pred, prefix2)
+                else:
+                    save_debug_3d_images(config, meta[0], pred, prefix2)
         timer.step("后处理")
 
 
@@ -174,6 +216,7 @@ def validate_3d(config, model, loader, output_dir):
     with torch.no_grad():
         end = time.time()
         for i, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(loader):
+            print(f"[validate] batch: {i}")
             data_time.update(time.time() - end)
             if config.TRAIN_2D_ONLY:
                 # 模型推理
@@ -183,13 +226,15 @@ def validate_3d(config, model, loader, output_dir):
                                targets_3d=targets_3d[0])
                 heatmaps, loss_2d = result  # heatmaps is predicted
             else:
-                if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET or 'association4d_v2' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
-                    pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta, targets_2d=targets_2d,
-                                                                  weights_2d=weights_2d, targets_3d=targets_3d[0])
-
-                elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
+                if config.PREDICT_ON_2DHEATMAP or 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
                     pred, heatmaps, grid_centers, _, _, _ = model(meta=meta, targets_3d=targets_3d[0],
                                                                   input_heatmaps=input_heatmap)
+                elif 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET or 'association4d_v2' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
+                    pred, heatmaps, grid_centers, _, _, _ = model(views=inputs, meta=meta, targets_2d=targets_2d,
+                                                                  weights_2d=weights_2d, targets_3d=targets_3d[0])
+                # elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
+                #     pred, heatmaps, grid_centers, _, _, _ = model(meta=meta, targets_3d=targets_3d[0],
+                #                                                   input_heatmaps=input_heatmap)
                 pred = pred.detach().cpu().numpy()
                 for b in range(pred.shape[0]):
                     preds.append(pred[b])
@@ -209,24 +254,33 @@ def validate_3d(config, model, loader, output_dir):
                               data_time=data_time, memory=gpu_memory_usage)
                     logger.info(msg)
 
+                    heatmap_dir = os.path.join(config.OUTPUT_DIR,config.DEBUG_HEATMAP_DIR, "2d_heatmaps_v2")
+                    os.makedirs(heatmap_dir, exist_ok=True)
+                    for k in range(len(inputs)):
+                        view_name = 'view_{}'.format(k + 1)
+                        prefix = '{}_{:08}_{}'.format(
+                            os.path.join(output_dir, 'validation'), i, view_name)
+                        save_debug_images_multi(
+                            config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
 
-            for k in range(len(inputs)):
-                view_name = 'view_{}'.format(k + 1)
-                prefix = '{}_{:08}_{}'.format(
-                    os.path.join(output_dir, 'validation'), i, view_name)
-                save_debug_images_multi(
-                    config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
+                        save_heatmaps(heatmaps[k], os.path.join(heatmap_dir, f"validate_heatmp2d_batch{i}_view{k}.jpg"))
+                    prefix2 = '{}_{:08}'.format(
+                        os.path.join(output_dir, 'validation'), i)
+                    if not config.TRAIN_2D_ONLY:
+                        save_debug_3d_cubes(config, meta[0], grid_centers, prefix2)
+                        if config.COCO2SHELF:
+                            new_pred = preds_coco2shelf(pred)
+                            save_debug_3d_images(config, meta[0], new_pred, prefix2)
+                        elif config.COCO2CAMPUS:
+                            new_pred = preds_coco2campus(pred)
+                            save_debug_3d_images(config, meta[0], new_pred, prefix2)
+                        else:
+                            save_debug_3d_images(config, meta[0], pred, prefix2)
 
-            prefix2 = '{}_{:08}'.format(
-                os.path.join(output_dir, 'validation'), i)
-            if not config.TRAIN_2D_ONLY:
-                save_debug_3d_cubes(config, meta[0], grid_centers, prefix2)
-                save_debug_3d_images(config, meta[0], pred, prefix2)
-
-    print("preds", preds)
+    print("preds", np.array(preds).shape)
     if not config.TRAIN_2D_ONLY:
         metric = None
-        if 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET :
+        if "ap" in config.EVALUATE.METRICS or 'panoptic' in config.DATASET.TEST_DATASET or 'association4d' in config.DATASET.TEST_DATASET :
             aps, _, mpjpe, recall = loader.dataset.evaluate(preds)
             msg = 'ap@25: {aps_25:.4f}\tap@50: {aps_50:.4f}\tap@75: {aps_75:.4f}\t' \
                   'ap@100: {aps_100:.4f}\tap@125: {aps_125:.4f}\tap@150: {aps_150:.4f}\t' \
@@ -236,20 +290,20 @@ def validate_3d(config, model, loader, output_dir):
                   )
             logger.info(msg)
             metric = np.mean(aps)
-        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
+        if "pcp" in config.EVALUATE.METRICS or 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or "shelf_end_to_end" in config.DATASET.TEST_DATASET:
             actor_pcp, avg_pcp, _, recall = loader.dataset.evaluate(preds)
             # print("data:", actor_pcp[0]*100, actor_pcp[1]*100, actor_pcp[2]*100, avg_pcp[0]*100, recall )
             # print( ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
             #           pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall))
-            # print("actor_pcp",actor_pcp)
-            # print("pcp_avg", avg_pcp )
+            print("actor_pcp",actor_pcp)
+            print("pcp_avg", avg_pcp )
             msg = '     | Actor 1 | Actor 2 | Actor 3 | Average | \n' \
                   ' PCP |  {pcp_1:.2f}  |  {pcp_2:.2f}  |  {pcp_3:.2f}  |  {pcp_avg:.2f}  |\t Recall@500mm: {recall:.4f}'.format(
-                      pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp[0]*100, recall=recall)
+                      pcp_1=actor_pcp[0]*100, pcp_2=actor_pcp[1]*100, pcp_3=actor_pcp[2]*100, pcp_avg=avg_pcp*100, recall=recall)
             logger.info(msg)
             metric = np.mean(avg_pcp)
 
-        return metric
+            return metric
 
 
 class AverageMeter(object):

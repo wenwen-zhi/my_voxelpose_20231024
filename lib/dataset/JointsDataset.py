@@ -61,6 +61,7 @@ class JointsDataset(Dataset):
 
         self.target_type = cfg.NETWORK.TARGET_TYPE
         self.image_size = np.array(cfg.NETWORK.IMAGE_SIZE)
+        self.input_image_size = np.array(cfg.NETWORK.IMAGE_SIZE)
         self.heatmap_size = np.array(cfg.NETWORK.HEATMAP_SIZE)
         self.sigma = cfg.NETWORK.SIGMA
         self.use_different_joints_weight = cfg.LOSS.USE_DIFFERENT_JOINTS_WEIGHT
@@ -141,6 +142,8 @@ class JointsDataset(Dataset):
             # 不使用backbone 
             if "pred_pose2d" in db_rec and db_rec["pred_pose2d"] !=None:
                 pred_pose2d = db_rec['pred_pose2d']
+                # print("pred_pose2d:", np.array(pred_pose2d).shape)
+                pred_pose2d = np.array(pred_pose2d)
                 for n in range(len(pred_pose2d)):
                     for i in range(len(pred_pose2d[n])):
                         pred_pose2d[n][i, 0:2] = affine_transform(pred_pose2d[n][i, 0:2], trans)
@@ -248,6 +251,47 @@ class JointsDataset(Dataset):
         #                4 * 256**2)
         return np.clip(np.maximum(maxy - miny, maxx - minx)**2,  1.0 / 4 * 96**2, 4 * 96**2)
 
+    def generate_3d_target(self, joints_3d):
+        num_people = len(joints_3d)
+
+        space_size = self.space_size
+        space_center = self.space_center
+        cube_size = self.initial_cube_size
+        grid1Dx = np.linspace(-space_size[0] / 2, space_size[0] / 2, cube_size[0]) + space_center[0]
+        grid1Dy = np.linspace(-space_size[1] / 2, space_size[1] / 2, cube_size[1]) + space_center[1]
+        grid1Dz = np.linspace(-space_size[2] / 2, space_size[2] / 2, cube_size[2]) + space_center[2]
+
+        target = np.zeros((cube_size[0], cube_size[1], cube_size[2]), dtype=np.float32)
+        cur_sigma = self.cfg.TRAIN.HEATMAP_SIGMA_3D
+
+        for n in range(num_people):
+            joint_id = self.root_id  # mid-hip
+            if isinstance(joint_id, int):
+                mu_x = joints_3d[n][joint_id][0]
+                mu_y = joints_3d[n][joint_id][1]
+                mu_z = joints_3d[n][joint_id][2]
+            elif isinstance(joint_id, list):
+                mu_x = (joints_3d[n][joint_id[0]][0] + joints_3d[n][joint_id[1]][0]) / 2.0
+                mu_y = (joints_3d[n][joint_id[0]][1] + joints_3d[n][joint_id[1]][1]) / 2.0
+                mu_z = (joints_3d[n][joint_id[0]][2] + joints_3d[n][joint_id[1]][2]) / 2.0
+            i_x = [np.searchsorted(grid1Dx, mu_x - 3 * cur_sigma),
+                   np.searchsorted(grid1Dx, mu_x + 3 * cur_sigma, 'right')]
+            i_y = [np.searchsorted(grid1Dy, mu_y - 3 * cur_sigma),
+                   np.searchsorted(grid1Dy, mu_y + 3 * cur_sigma, 'right')]
+            i_z = [np.searchsorted(grid1Dz, mu_z - 3 * cur_sigma),
+                   np.searchsorted(grid1Dz, mu_z + 3 * cur_sigma, 'right')]
+            if i_x[0] >= i_x[1] or i_y[0] >= i_y[1] or i_z[0] >= i_z[1]:
+                continue
+
+            gridx, gridy, gridz = np.meshgrid(grid1Dx[i_x[0]:i_x[1]], grid1Dy[i_y[0]:i_y[1]], grid1Dz[i_z[0]:i_z[1]],
+                                              indexing='ij')
+            g = np.exp(-((gridx - mu_x) ** 2 + (gridy - mu_y) ** 2 + (gridz - mu_z) ** 2) / (2 * cur_sigma ** 2))
+            target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]] = np.maximum(
+                target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]], g)
+
+        target = np.clip(target, 0, 1)
+        return target
+
     def generate_target_heatmap(self, joints, joints_vis):
         # print(joints,joints_vis)
 
@@ -322,44 +366,6 @@ class JointsDataset(Dataset):
 
         return target, target_weight
 
-    def generate_3d_target(self, joints_3d):
-        num_people = len(joints_3d)
-
-        space_size = self.space_size
-        space_center = self.space_center
-        cube_size = self.initial_cube_size
-        grid1Dx = np.linspace(-space_size[0] / 2, space_size[0] / 2, cube_size[0]) + space_center[0]
-        grid1Dy = np.linspace(-space_size[1] / 2, space_size[1] / 2, cube_size[1]) + space_center[1]
-        grid1Dz = np.linspace(-space_size[2] / 2, space_size[2] / 2, cube_size[2]) + space_center[2]
-
-        target = np.zeros((cube_size[0], cube_size[1], cube_size[2]), dtype=np.float32)
-        cur_sigma = self.cfg.TRAIN.HEATMAP_SIGMA_3D
-
-        for n in range(num_people):
-            joint_id = self.root_id  # mid-hip
-            if isinstance(joint_id, int):
-                mu_x = joints_3d[n][joint_id][0]
-                mu_y = joints_3d[n][joint_id][1]
-                mu_z = joints_3d[n][joint_id][2]
-            elif isinstance(joint_id, list):
-                mu_x = (joints_3d[n][joint_id[0]][0] + joints_3d[n][joint_id[1]][0]) / 2.0
-                mu_y = (joints_3d[n][joint_id[0]][1] + joints_3d[n][joint_id[1]][1]) / 2.0
-                mu_z = (joints_3d[n][joint_id[0]][2] + joints_3d[n][joint_id[1]][2]) / 2.0
-            i_x = [np.searchsorted(grid1Dx,  mu_x - 3 * cur_sigma),
-                       np.searchsorted(grid1Dx,  mu_x + 3 * cur_sigma, 'right')]
-            i_y = [np.searchsorted(grid1Dy,  mu_y - 3 * cur_sigma),
-                       np.searchsorted(grid1Dy,  mu_y + 3 * cur_sigma, 'right')]
-            i_z = [np.searchsorted(grid1Dz,  mu_z - 3 * cur_sigma),
-                       np.searchsorted(grid1Dz,  mu_z + 3 * cur_sigma, 'right')]
-            if i_x[0] >= i_x[1] or i_y[0] >= i_y[1] or i_z[0] >= i_z[1]:
-                continue
-
-            gridx, gridy, gridz = np.meshgrid(grid1Dx[i_x[0]:i_x[1]], grid1Dy[i_y[0]:i_y[1]], grid1Dz[i_z[0]:i_z[1]], indexing='ij')
-            g = np.exp(-((gridx - mu_x) ** 2 + (gridy - mu_y) ** 2 + (gridz - mu_z) ** 2) / (2 * cur_sigma ** 2))
-            target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]] = np.maximum(target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]], g)
-
-        target = np.clip(target, 0, 1)
-        return target
 
 
     def generate_input_heatmap(self, joints):

@@ -129,16 +129,37 @@ class MyDataset(JointsDataset):
         with open(projfile,'r',encoding='utf-8') as f:
             proj=json.load(f)
         return proj
-    def _get_cam(self,dataset_dir):
-        cam_file = osp.join(dataset_dir, "calibration.json")
+
+    # def _get_cam(self,dataset_dir):
+    #     cam_file = osp.join(dataset_dir, "calibration.json")
+    #     with open(cam_file) as cfile:
+    #         cameras = json.load(cfile)
+    #     for id, cam in cameras.items():
+    #         for k, v in cam.items():
+    #             cameras[id][k] = np.array(v)
+    #         cameras[id]["R"]=cameras[id]['R'].reshape((3,3))
+    #         cameras[id]["T"]=cameras[id]['T'].reshape((3,1))
+    #     return cameras
+
+    def _get_cam(self, seq):
+        cam_file = osp.join(self.dataset_root, seq, 'new_calibration_file.json')  # 假设新的文件路径
         with open(cam_file) as cfile:
-            cameras = json.load(cfile)
-        for id, cam in cameras.items():
-            for k, v in cam.items():
-                cameras[id][k] = np.array(v)
-            cameras[id]["R"]=cameras[id]['R'].reshape((3,3))
-            cameras[id]["T"]=cameras[id]['T'].reshape((3,1))
+            calib = json.load(cfile)
+
+        cameras = {}
+        for cam_id, cam_data in calib.items():  # 假设 calib 直接是一个包含所有相机数据的字典
+            if cam_id in self.cam_list:  # 现在假设 self.cam_list 包含的是相机ID
+                sel_cam = {}
+                sel_cam['K'] = np.array(cam_data['K']).reshape((3, 3))  # 调整为3x3矩阵
+                sel_cam['distCoef'] = np.array(cam_data['distCoeff'])  # 注意字段名的小变化
+                sel_cam['R'] = np.array(cam_data['R']).reshape((3, 3))  # 调整为3x3矩阵
+                sel_cam['t'] = np.array(cam_data['T']).reshape((3, 1))  # 确保为3x1向量
+                sel_cam['imgSize'] = cam_data['imgSize']  # 可选，如果需要图像尺寸信息
+                if 'rectifyAlpha' in cam_data:  # 可选，如果需要矫正系数
+                    sel_cam['rectifyAlpha'] = cam_data['rectifyAlpha']
+                cameras[cam_id] = sel_cam
         return cameras
+
     def _get_db(self):
         db = [] #[v1,v2,v3,v1,v2,v3,v1,v2,v3]
         # 加载相关参数
@@ -154,6 +175,7 @@ class MyDataset(JointsDataset):
                     proj=proj_dict[camera_name]
                     proj=np.array(proj)
                     # print(proj)
+
                     db.append({
                         'key': "{}_{}".format(frame_idx, camera_name),
                         'image': osp.join(self.dataset_root, image_path),

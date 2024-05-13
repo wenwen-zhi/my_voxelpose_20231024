@@ -69,18 +69,21 @@ class CampusEndToEnd(JointsDataset):
         self.num_views = len(self.cam_list)
         self.frame_range = list(range(350, 471)) + list(range(650, 751))
 
-        self.pred_pose2d = self._get_pred_pose2d()
+        # self.pred_pose2d = self._get_pred_pose2d()
         self.db = self._get_db()
 
         self.db_size = len(self.db)
 
-    def _get_pred_pose2d(self):
-        file = os.path.join(self.dataset_root, "pred_campus_maskrcnn_hrnet_coco.pkl")
-        with open(file, "rb") as pfile:
-            logging.info("=> load {}".format(file))
-            pred_2d = pickle.load(pfile)
+    # def _get_pred_pose2d(self):
+    #     file = os.path.join(self.dataset_root, "pred_campus_maskrcnn_hrnet_coco.pkl")
+    #     with open(file, "rb") as pfile:
+    #         logging.info("=> load {}".format(file))
+    #         pred_2d = pickle.load(pfile)
+    # 
+    #     return pred_2d
 
-        return pred_2d
+    def _get_frames(self):
+        frames_path = os.path.join(self.dataset_root, "frames.json")
 
     def _get_db(self):
         width = 360
@@ -106,6 +109,14 @@ class CampusEndToEnd(JointsDataset):
                         'camera': cameras[cam_name]
                     })
 
+        # 读取campus的非零帧用于训练train
+        non_empty_frame_indices = []  # 用于存储非零帧的索引
+        for frame_idx in range(actor_3d.shape[1]):
+            tmp = [actor_3d[p_idx][frame_idx].size for p_idx in range(3)]
+            if sum(tmp) != 0:
+                non_empty_frame_indices.append(frame_idx)
+
+        self.frame_range = non_empty_frame_indices
 
         for i in self.frame_range: # for each frame
             for k, cam in cameras.items(): # for each view(camera)
@@ -141,9 +152,9 @@ class CampusEndToEnd(JointsDataset):
                             np.repeat(
                                 np.reshape(joints_vis, (-1, 1)), 2, axis=1))
 
-                pred_index = '{}_{}'.format(k, i)
-                preds = self.pred_pose2d[pred_index]
-                preds = [np.array(p["pred"]) for p in preds]
+                # pred_index = '{}_{}'.format(k, i)
+                # preds = self.pred_pose2d[pred_index]
+                # preds = [np.array(p["pred"]) for p in preds]
 
                 db.append({
                     'image': osp.join(self.dataset_root, image),
@@ -152,7 +163,7 @@ class CampusEndToEnd(JointsDataset):
                     'joints_2d': all_poses,
                     'joints_2d_vis': all_poses_vis,
                     'camera': cam,
-                    'pred_pose2d': preds
+                    # 'pred_pose2d': preds
                 })
         return db
 
@@ -214,9 +225,11 @@ class CampusEndToEnd(JointsDataset):
         bone_correct_parts = np.zeros((num_person, 10))
 
         for i, fi in enumerate(self.frame_range):
-            pred_coco = preds[i].copy()
-            pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
-            pred = np.stack([self.coco2campus3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+            # pred_coco = preds[i].copy()
+            # pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
+            # pred = np.stack([self.coco2campus3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+            pred = preds[i].copy()
+            pred = pred[pred[:, 0, 3] >= 0, :, :3]
 
             for person in range(num_person):
                 gt = actor_3d[person][fi] * 1000.0

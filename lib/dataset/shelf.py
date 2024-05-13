@@ -66,6 +66,7 @@ class Shelf(JointsDataset):
         self.cam_list = [0, 1, 2, 3, 4]
         self.num_views = len(self.cam_list)
         self.frame_range = list(range(300, 601))
+        # self.frame_range = list(range(300, 304))
         # if self.mode!="test":
         self.pred_pose2d = self._get_pred_pose2d()
         self.db = self._get_db()

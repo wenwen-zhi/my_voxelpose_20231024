@@ -1,0 +1,129 @@
+CUDNN:
+  BENCHMARK: true
+  DETERMINISTIC: false
+  ENABLED: true
+
+BACKBONE_MODEL: 'pose_resnet'
+MODEL: 'multi_person_posenet'
+DATA_DIR: ''
+GPUS: '0'
+OUTPUT_DIR: 'output'
+LOG_DIR: 'log'
+WORKERS: 0
+PRINT_FREQ: 50 #打印频率
+TAG: "ue"
+TRAIN_2D_ONLY: false
+PREDICT_ON_2DHEATMAP: true
+UNIT: "m"
+RESULTS_DIR: "ue_dataset/resnet50/joints23/synthetic_v2_on_running_data"  #
+DEBUG_HEATMAP_DIR: "ue_dataset/resnet50/joints23/synthetic_v2_on_running_data/debug"
+MODEL_SAVE_INTERVAL: 100
+
+EVALUATE:
+  METRICS:
+    - 'ap'
+
+DATASET:
+  COLOR_RGB: True
+  TRAIN_DATASET: 'ue_dataset_synthetic_v2' #训练时所使用的数据集加载器 ，会影响权重保存路径，因此会影响测试时加载权重文件的文件夹
+  TEST_DATASET: 'ue_dataset_synthetic_v2'
+  DATA_FORMAT: jpeg
+  DATA_AUGMENTATION: False
+  FLIP: False
+  ROOT: '/home/tww/Datasets/ue/joints23' # 'data/panoptic/
+  ROT_FACTOR: 45 # 这个参数无用
+  SCALE_FACTOR: 0.35 # 这个参数无用
+  TEST_SUBSET: 'validation'
+  TRAIN_SUBSET: 'train'
+  ROOTIDX: 0
+  # 根关节点编号
+  CAMERA_NUM: 4
+  NUM_JOINTS: 23
+  IMAGE_WIDTH: 1280
+  IMAGE_HEIGHT: 720
+  NUM_FRAMES: 888
+  SAMPLE_INTERVAL: 2 # 每几个帧取一帧用于训练和测试
+NETWORK:
+  PRETRAINED_BACKBONE: '' #"models/pose_resnet50_panoptic.pth.tar"  #预训练模型骨干网络
+  PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth' #预训练模型路径
+  TARGET_TYPE: gaussian
+  IMAGE_SIZE:
+  - 1280
+  - 720
+  HEATMAP_SIZE:
+  - 320
+  - 184
+  SIGMA: 3
+  NUM_JOINTS: 23
+  USE_GT: False
+POSE_RESNET:
+  FINAL_CONV_KERNEL: 1
+  DECONV_WITH_BIAS: False
+  NUM_DECONV_LAYERS: 3
+  NUM_DECONV_FILTERS:
+  - 256
+  - 256
+  - 256
+  NUM_DECONV_KERNELS:
+  - 4
+  - 4
+  - 4
+  NUM_LAYERS: 50
+LOSS:
+  USE_TARGET_WEIGHT: true
+TRAIN:
+  BATCH_SIZE: 1
+  SHUFFLE: true
+  BEGIN_EPOCH: 0
+  END_EPOCH: 60 # 10
+  RESUME: true
+  OPTIMIZER: adam
+  LR: 0.0001
+  TRAIN_BACKBONE: false
+  ENABLE_CACHE: false
+  ROOT_DIST_THRESHOLD: 0.5 #匹配pred和gt的跟关节时的距离阈值
+  HEATMAP_SIGMA_3D: 0.2 # 生成3d gt heatmap的高斯分布的sigma
+TEST:
+  MODEL_FILE: 'model_best.pth.tar'
+  BATCH_SIZE: 4
+DEBUG:
+  DEBUG: true
+  SAVE_BATCH_IMAGES_GT: true
+  SAVE_HEATMAPS_GT: true
+  SAVE_HEATMAPS_PRED: true
+MULTI_PERSON:
+  SPACE_SIZE: # 世界坐标系中我们所关注的空间。会把这部分空间投影到2D图像中，去获得2D信息，从而进行3D的识别。
+    - 20
+    - 6
+    - 3.2
+    # - 50000
+    # - 3200
+    # - 3200
+#    - 1500.0
+#    - 1500.0
+#    - 1500.0
+  SPACE_CENTER: # 在世界坐标系中，以某个点为中心，框出一块区域，区域的大小为 SPACE_SIZE，中心点的x,y,z坐标
+    - 35 # 120.0
+    - -5 # -600.0
+    - 1
+    # - 20000 # 120.0
+    # - -4000 # -600.0
+    # - 1000
+  INITIAL_CUBE_SIZE: # 整个空间划分为多少个框，每个框会被检测是否包含一个人的根关键点
+    - 200
+    - 60
+    - 32
+  MAX_PEOPLE_NUM: 3
+  THRESHOLD: 0.1
+PICT_STRUCT:
+  GRID_SIZE: # 人体的框的大小
+    - 2
+    - 2
+    - 2
+    # - 2000
+    # - 2000
+    # - 2000
+  CUBE_SIZE: # 人体的框中进一步划分为cube_size个关键点框
+    - 64
+    - 64
+    - 64

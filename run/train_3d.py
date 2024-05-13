@@ -110,7 +110,7 @@ def main():
     # model = eval ("models.multi_person_posenet.get_multi_person_pose_net")(config, is_train=True)
     # model = models.multi_person_posenet.get_multi_person_pose_net(config, is_train=True)
     model = get_model(config.MODEL ).get_multi_person_pose_net(config, is_train=True)
-    print("backbone:",model.backbone)
+    # print("backbone:",model.backbone)
     # input()
     # with torch.no_grad():
     #     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
@@ -126,7 +126,7 @@ def main():
         model = load_backbone_panoptic(model, config.NETWORK.PRETRAINED_BACKBONE)
 
     if config.TRAIN.RESUME:
-        start_epoch, model, optimizer, best_precision = load_checkpoint(model, optimizer, final_output_dir)
+        start_epoch, model, optimizer, best_precision = load_checkpoint(model, optimizer, final_output_dir, load_optimizer_state=config.TRAIN.LOAD_OPTIMIZER_STATE)
 
     writer_dict = {
         'writer': SummaryWriter(log_dir=tb_log_dir),
@@ -140,19 +140,19 @@ def main():
         print('Epoch: {}'.format(epoch))
 
         # lr_scheduler.step()
-        #
+
         train_3d(config, model, optimizer, train_loader, epoch, final_output_dir, writer_dict)
         # 验证，计算指标
         precision = validate_3d(config, model, test_loader, final_output_dir)
 
-
-        if precision > best_precision:
+        if precision is None:
+            best_model = True
+        elif precision  > best_precision:
             best_precision = precision
             best_model = True
         else:
             # best_model = False
             best_model = True
-
 
         logger.info('=> saving checkpoint to {} (Best: {})'.format(final_output_dir, best_model))
         # 保存模型的权重

@@ -8,7 +8,6 @@ import torch
 import numpy as np
 
 
-
 def unfold_camera_param(camera, device=None):
     R = torch.as_tensor(camera['R'], dtype=torch.float, device=device)
     T = torch.as_tensor(camera['T'], dtype=torch.float, device=device)
@@ -22,6 +21,7 @@ def unfold_camera_param(camera, device=None):
     k = torch.as_tensor(camera['k'], dtype=torch.float, device=device)
     p = torch.as_tensor(camera['p'], dtype=torch.float, device=device)
     return R, T, f, c, k, p
+
 
 def project_point_radial(x, R, T, f, c, k, p):
     """
@@ -40,14 +40,13 @@ def project_point_radial(x, R, T, f, c, k, p):
     # 打印出这几个的形状，全部打印一下
     # print("X:",x.shape)
 
-
-    xcam = torch.mm(R, torch.t(x)- T)
+    xcam = torch.mm(R, torch.t(x) - T)
 
     y = xcam[:2] / (xcam[2] + 1e-5)
 
     kexp = k.repeat((1, n))
-    r2 = torch.sum(y**2, 0, keepdim=True)
-    r2exp = torch.cat([r2, r2**2, r2**3], 0)
+    r2 = torch.sum(y ** 2, 0, keepdim=True)
+    r2exp = torch.cat([r2, r2 ** 2, r2 ** 3], 0)
     radial = 1 + torch.einsum('ij,ij->j', kexp, r2exp)
 
     tan = p[0] * y[1] + p[1] * y[0]
@@ -59,9 +58,27 @@ def project_point_radial(x, R, T, f, c, k, p):
     return torch.t(ypixel)
 
 
-def project_pose(x, camera):
-    R, T, f, c, k, p = unfold_camera_param(camera, device=x.device)
-    return project_point_radial(x, R, T, f, c, k, p)
+# def project_pose(x, camera):
+#     R, T, f, c, k, p = unfold_camera_param(camera, device=x.device)
+#     return project_point_radial(x, R, T, f, c, k, p)
+
+
+def project_pose(pose3d, camera, transpose=False):
+    device = None
+    if isinstance(pose3d, (torch.Tensor)):
+        device = pose3d.device
+        pose3d = pose3d.detach().cpu().numpy()
+    # print("posr3d shape:", pose3d.shape)
+    if transpose:
+        M = np.array([[1.0, 0.0, 0.0],
+                      [0.0, 0.0, 1.0],
+                      [0.0, 1.0, 0.0]])
+        pose3d[:, 0:3] = pose3d[:, 0:3].dot(M)  # 这个可能是我们自己加的？可能是为了方便可视化，有印象吗，好像本来是倒着的，弄了后就正了？
+    pose3d = torch.from_numpy(pose3d)
+    if device:
+        pose3d = pose3d.to(device)
+    R, T, f, c, k, p = unfold_camera_param(camera, device=device)
+    return project_point_radial(pose3d, R, T, f, c, k, p,)
 
 
 def world_to_camera_frame(x, R, T):

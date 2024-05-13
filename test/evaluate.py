@@ -105,8 +105,17 @@ def main():
 
         # 计算指标，打印结果
         tb = PrettyTable()
+        # #############
+
+
+
+
+        ####  童雯雯看这里！！！！
+        ###  把ue_dataset 加到下面这里的判断条件里面
+
+        ##########
         if 'panoptic' in config.DATASET.TEST_DATASET or "association4d" in config.DATASET.TEST_DATASET \
-                or "association4d_v2" in config.DATASET.TEST_DATASET :
+                or "association4d_v2" in config.DATASET.TEST_DATASET or "ue_dataset" in config.DATASET.TEST_DATASET:
             mpjpe_threshold = np.arange(25, 155, 25)
 
             aps, recs, mpjpe, _ = test_dataset.evaluate(preds)
@@ -116,6 +125,7 @@ def main():
             print(tb)
             print(f'MPJPE: {mpjpe:.2f}mm')
         else:
+
             actor_pcp, avg_pcp, bone_person_pcp, _ = test_dataset.evaluate(preds)
             tb.field_names = ['Bone Group'] + [f'Actor {i + 1}' for i in range(len(actor_pcp))] + ['Average']
             for k, v in bone_person_pcp.items():

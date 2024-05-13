@@ -7,6 +7,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import copy
+
 import numpy as np
 import cv2
 
@@ -268,3 +270,80 @@ def procrustes_transform(target_pose, from_pose):
     align_pose = s * from_pose.dot(rot) + t
 
     return align_pose
+
+def coco2shelf3D(coco_pose):
+    """
+    transform coco order(our method output) 3d pose to shelf dataset order with interpolation
+    :param coco_pose: np.array with shape 17x3
+    :return: 3D pose in shelf order with shape 14x3
+    """
+    shelf_pose = np.zeros((14, 3))
+    coco2shelf = np.array([16, 14, 12, 11, 13, 15, 10, 8, 6, 5, 7, 9])
+    shelf_pose[0: 12] += coco_pose[coco2shelf]
+
+    mid_sho = (coco_pose[5] + coco_pose[6]) / 2  # L and R shoulder
+    head_center = (coco_pose[3] + coco_pose[4]) / 2  # middle of two ear
+
+    head_bottom = (mid_sho + head_center) / 2  # nose and head center
+    head_top = head_bottom + (head_center - head_bottom) * 2
+    # shelf_pose[12] += head_bottom
+    # shelf_pose[13] += head_top
+
+    shelf_pose[12] = (shelf_pose[8] + shelf_pose[9]) / 2  # Use middle of shoulder to init
+    shelf_pose[13] = coco_pose[0]  # use nose to init
+
+    shelf_pose[13] = shelf_pose[12] + (shelf_pose[13] - shelf_pose[12]) * np.array([0.75, 0.75, 1.5])
+    shelf_pose[12] = shelf_pose[12] + (coco_pose[0] - shelf_pose[12]) * np.array([0.5, 0.5, 0.5])
+
+    alpha = 0.75
+    shelf_pose[13] = shelf_pose[13] * alpha + head_top * (1 - alpha)
+    shelf_pose[12] = shelf_pose[12] * alpha + head_bottom * (1 - alpha)
+
+    return shelf_pose
+
+def preds_coco2shelf(preds_coco):
+    if isinstance(preds_coco, torch.Tensor):
+        preds_coco=preds_coco.detach().cpu().numpy()
+    new_preds=[]
+    for i in range(0, len(preds_coco)):
+        pred_coco = preds_coco[i].copy()
+        print("pred_coco.shape", pred_coco.shape)
+        pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
+        pred = np.stack([coco2shelf3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+        new_preds.append(pred)
+    new_preds=np.array(new_preds)
+    return new_preds
+
+def preds_coco2campus(preds_coco):
+    if isinstance(preds_coco, torch.Tensor):
+        preds_coco=preds_coco.detach().cpu().numpy()
+    new_preds=[]
+    for i in range(0, len(preds_coco)):
+        pred_coco = preds_coco[i].copy()
+        print("pred_coco.shape", pred_coco.shape)
+        pred_coco = pred_coco[pred_coco[:, 0, 3] >= 0, :, :3]
+        pred = np.stack([coco2campus3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
+        new_preds.append(pred)
+    new_preds=np.array(new_preds)
+    return new_preds
+
+
+def coco2campus3D(coco_pose):
+    """
+    transform coco order(our method output) 3d pose to shelf dataset order with interpolation
+    :param coco_pose: np.array with shape 17x3
+    :return: 3D pose in campus order with shape 14x3
+    """
+    campus_pose = np.zeros((14, 3))
+    coco2campus = np.array([16, 14, 12, 11, 13, 15, 10, 8, 6, 5, 7, 9])
+    campus_pose[0: 12] += coco_pose[coco2campus]
+
+    mid_sho = (coco_pose[5] + coco_pose[6]) / 2  # L and R shoulder
+    head_center = (coco_pose[3] + coco_pose[4]) / 2  # middle of two ear
+
+    head_bottom = (mid_sho + head_center) / 2  # nose and head center
+    head_top = head_bottom + (head_center - head_bottom) * 2
+    campus_pose[12] += head_bottom
+    campus_pose[13] += head_top
+
+    return campus_pose

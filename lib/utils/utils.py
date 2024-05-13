@@ -55,7 +55,10 @@ def create_logger(cfg, cfg_name, phase='train'):
     model, _ = get_model_name(cfg)
     cfg_name = os.path.basename(cfg_name).split('.')[0]
 
-    final_output_dir = root_output_dir / dataset / model / cfg_name
+    if cfg.RESULTS_DIR:
+        final_output_dir = root_output_dir / cfg.RESULTS_DIR
+    else:
+        final_output_dir = root_output_dir / dataset / model / cfg_name
 
     print('=> creating {}'.format(final_output_dir))
     final_output_dir.mkdir(parents=True, exist_ok=True)
@@ -109,14 +112,16 @@ def load_model_state(model, output_dir, epoch):
         return model
 
 
-def load_checkpoint(model, optimizer, output_dir, filename='checkpoint.pth.tar'):
+def load_checkpoint(model, optimizer, output_dir, filename='checkpoint.pth.tar', load_optimizer_state=True):
     file = os.path.join(output_dir, filename)
+    print("loading checkpoint from ", file)
     if os.path.isfile(file):
         checkpoint = torch.load(file)
         start_epoch = checkpoint['epoch']
         precision = checkpoint['precision'] if 'precision' in checkpoint else 0
         model.module.load_state_dict(checkpoint['state_dict'])
-        # optimizer.load_state_dict(checkpoint['optimizer'])
+        if load_optimizer_state:
+            optimizer.load_state_dict(checkpoint['optimizer'])  #是不是这里不用了checkpoint？？这个加载的是上一次训练的优化器里面的信息，估计是学习率以及一些相关参数什么的。
         print('=> load checkpoint {} (epoch {})'
               .format(file, start_epoch))
 

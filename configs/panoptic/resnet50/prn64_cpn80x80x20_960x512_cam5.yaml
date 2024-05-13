@@ -10,6 +10,9 @@ OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
 WORKERS: 4
 PRINT_FREQ: 100
+#TRAIN_2D_ONLY: true
+MODEL_SAVE_INTERVAL: 100
+RESULTS_DIR: "panoptic/resnet50/prn64_cpn80x80x20_960x512_cam5/joint_training"
 
 DATASET:
   COLOR_RGB: True
@@ -26,10 +29,10 @@ DATASET:
   ROOTIDX: 2
   CAMERA_NUM: 5
 NETWORK:
-  PRETRAINED_BACKBONE: "models/pose_resnet50_panoptic.pth.tar"
+  PRETRAINED_BACKBONE: '' #"models/pose_resnet50_panoptic.pth.tar"
   PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
-  IMAGE_SIZE:
+  IMAGE_SIZE: #  width = 1920 height = 1080
   - 960
   - 512
   HEATMAP_SIZE:
@@ -54,10 +57,12 @@ POSE_RESNET:
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
+#  TRAIN_BACKBONE: true
+  LOAD_OPTIMIZER_STATE: false
   BATCH_SIZE: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 10
+  END_EPOCH: 100
   RESUME: true
   OPTIMIZER: adam
   LR: 0.0001

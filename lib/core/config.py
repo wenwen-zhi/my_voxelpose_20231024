@@ -27,9 +27,17 @@ config.WORKERS = 8
 config.PRINT_FREQ = 100
 config.TRAIN_2D_ONLY = False
 config.USE_POSE2D_PRED = True
+config.PREDICT_ON_2DHEATMAP = False
 config.UNIT="mm"
 # higherhrnet definition
 config.DEBUG_HEATMAP_DIR="debug"
+config.RESULTS_DIR=None
+config.MODEL_SAVE_INTERVAL = None
+config.COCO2SHELF = False
+config.COCO2CAMPUS = False
+
+config.CAMERA=edict()
+config.CAMERA.TRANSPOSE_WHEN_PROJECT = False
 
 config.MODEL_EXTRA = edict()
 config.MODEL_EXTRA.PRETRAINED_LAYERS = ['*']
@@ -136,6 +144,11 @@ config.DATASET.ROT_FACTOR = 0
 
 # rsn特有参数
 
+# evaluate
+
+config.EVALUATE = edict()
+config.EVALUATE.METRICS = []
+
 
 # train
 config.TRAIN = edict()
@@ -153,9 +166,11 @@ config.TRAIN.GAMMA2 = 0.0
 config.TRAIN.BEGIN_EPOCH = 0
 config.TRAIN.END_EPOCH = 140
 
-config.TRAIN.RESUME = False
-config.TRAIN.TRAIN_BACKBONE = False
+#
+config.TRAIN.RESUME = False # 在之前的基础上继续训练 ，可能没用到？？
+config.TRAIN.TRAIN_BACKBONE = False # 训练 backbone
 config.TRAIN.ENABLE_CACHE = True
+config.TRAIN.LOAD_OPTIMIZER_STATE = True # 加载之前保存的优化器状态
 
 config.TRAIN.BATCH_SIZE = 8
 config.TRAIN.SHUFFLE = True
@@ -181,6 +196,9 @@ config.TEST.DETECTOR = 'fpn_dcn'
 config.TEST.DETECTOR_DIR = ''
 config.TEST.MODEL_FILE = ''
 config.TEST.HEATMAP_LOCATION_FILE = 'predicted_heatmaps.h5'
+config.TEST.PREDICT_FROM_IMAGES = True
+config.TEST.SAVE_WITH_TIMESTAMPS = True
+
 
 # debug
 config.DEBUG = edict()

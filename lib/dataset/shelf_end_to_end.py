@@ -230,9 +230,7 @@ class ShelfEndToEnd(JointsDataset):
             # pred = np.stack([self.coco2shelf3D(p) for p in copy.deepcopy(pred_coco[:, :, :3])])
 
             pred=preds[i].copy()
-            print("beforpred", pred, pred.shape)
             pred = pred[pred[:, 0, 3] >= 0, :, :3]
-            print("pred",pred,pred.shape)
 
             for person in range(num_person):
                 gt = actor_3d[person][fi] * 1000.0
@@ -240,7 +238,6 @@ class ShelfEndToEnd(JointsDataset):
                     continue
 
                 mpjpes = np.mean(np.sqrt(np.sum((gt[np.newaxis] - pred) ** 2, axis=-1)), axis=-1)
-                print("mpjpes:",mpjpes)
                 min_n = np.argmin(mpjpes)
                 min_mpjpe = np.min(mpjpes)
                 if min_mpjpe < recall_threshold:

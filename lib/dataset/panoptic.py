@@ -84,7 +84,7 @@ class Panoptic(JointsDataset):
         self.num_joints = len(JOINTS_DEF)
         if self.image_set == 'train':
             self.sequence_list = TRAIN_LIST
-            self._interval = 10
+            self._interval = 4
             # self._interval = 1000
             self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
@@ -93,7 +93,7 @@ class Panoptic(JointsDataset):
             self.num_views = len(self.cam_list)
         elif self.image_set == 'validation':
             self.sequence_list = VAL_LIST
-            self._interval = 20
+            self._interval = 100
             # self._interval = 1000
             self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)][:self.num_views]
             # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13)][:self.num_views]
@@ -102,7 +102,7 @@ class Panoptic(JointsDataset):
         self.db_file = 'group_{}_cam{}.pkl'.format(self.image_set, self.num_views)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
         # disable
-        if False and osp.exists(self.db_file):
+        if True and osp.exists(self.db_file):
             info = pickle.load(open(self.db_file, 'rb'))
             assert info['sequence_list'] == self.sequence_list
             assert info['interval'] == self._interval
@@ -260,6 +260,7 @@ class Panoptic(JointsDataset):
         return self.db_size // self.num_views
 
     def evaluate(self, preds):
+        # print("[panoptic.evaluate] preds:", preds)
         eval_list = []
         gt_num = self.db_size // self.num_views
         assert len(preds) == gt_num, 'number mismatch'
