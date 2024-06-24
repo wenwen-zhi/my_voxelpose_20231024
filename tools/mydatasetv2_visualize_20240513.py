@@ -7,25 +7,40 @@ import os
 SKELETON_CONNECTIONS = np.array([0,1,0,15,0,22,1,2,1,5,1,8,3,4,4,5,6,7,7,8,9,10,9,15,10,11,10,12,10,13,10,14,
                   16,17,16,22,17,18,17,19,17,20,17,21]).reshape((-1, 2)).tolist()
 
+# 定义固定颜色列表
+COLORS = [
+    (0, 255, 0),    # 绿色
+    (0, 0, 255),    # 蓝色
+    (255, 255, 0),  # 黄色
+    (255, 0, 255),  # 品红
+    (0, 255, 255),  # 青色
+    (128, 0, 0),    # 深红色
+    (0, 128, 0),    # 深绿色
+    (0, 0, 128),    # 深蓝色
+    (128, 128, 0),  # 橄榄色
+    (128, 0, 128),  # 紫色
+    (0, 128, 128)   # 深青色
+]
 
 def visualize_frame_poses(frame_data, img_dir, frame_idx, output_path, visibility_threshold=0.1):
     images = []
+    color_index = 0  # 用于轮流选择颜色的索引
     for camera_id, poses in frame_data.items():
         img_path = os.path.join(img_dir, camera_id, "{:06d}.jpg".format(frame_idx + 1))
         img = cv2.imread(img_path)
-        for person_pose in poses:
+        for person_index, person_pose in enumerate(poses):
+            color = COLORS[color_index % len(COLORS)]  # 选择颜色
+            color_index += 1
             for x, y, v in person_pose:
                 if v >= visibility_threshold:
-                    cv2.circle(img, (int(x), int(y)), 3, (0, 255, 0), -1)  # 绘制关节点
+                    cv2.circle(img, (int(x), int(y)), 3, color, -1)  # 绘制关节点
             # 绘制骨架
-            print(np.array(person_pose).shape)
-            print(person_pose)
             for start_idx, end_idx in SKELETON_CONNECTIONS:
                 if person_pose[start_idx][2] >= visibility_threshold and person_pose[end_idx][
                     2] >= visibility_threshold:
                     start_point = tuple(map(int, person_pose[start_idx][:2]))
                     end_point = tuple(map(int, person_pose[end_idx][:2]))
-                    cv2.line(img, start_point, end_point, (0, 250, 0), 5)  # 绘制骨架线
+                    cv2.line(img, start_point, end_point, color, 2)  # 绘制骨架线
         images.append(img)
 
     # 如果没有图像，直接返回

@@ -14,8 +14,11 @@ for image in images:
     image_path = os.path.join(image_folder, image)
     image_list.append(imageio.imread(image_path))
 
+# 反转图像列表以倒序生成GIF
+image_list.reverse()
+
 # 指定输出GIF文件路径
-gif_path = '/home/tww/Datasets/real/datasets/v1_vis/animation.gif'
+gif_path = '/home/tww/Datasets/real/datasets/v1_vis/animation_reverse.gif'
 
 # 保存GIF文件
 imageio.mimsave(gif_path, image_list)
